@@ -108,3 +108,42 @@ class LocalLLMServer:
 
         LOG.info("Starting uvicorn on %s:%s", host, port)
         uvicorn.run(self.app, host=host, port=port, **uvicorn_kwargs)
+
+
+if __name__ == "__main__":
+    import os
+
+    LLLM_MODEL_ID = (
+        os.environ.get("LLLM_MODEL_ID")
+        or input(
+            "Enter model ID [default: ibm-granite/granite-3b-code-instruct-128k]: "
+        )
+        or "ibm-granite/granite-3b-code-instruct-128k"
+    )
+
+    LLLM_BITNESS = (
+        os.environ.get("LLLM_BITNESS")
+        or input("Enter quantization bitness (4bit / 8bit / 16bit) [default: 16bit]: ")
+        or "16bit"
+    )
+
+    LLLM_PORT = int(
+        os.environ.get("LLLM_PORT") or input("Enter port [default: 8000]: ") or 8000
+    )
+    LLLM_HOST = (
+        os.environ.get("LLLM_HOST")
+        or input("Default host [default: 0.0.0.0]: ")
+        or "0.0.0.0"
+    )
+
+    print("\n--------------------------------")
+    print(f"Starting Local LLM Server")
+    print(f"Model:            {LLLM_MODEL_ID}")
+    print(f"Host:             {LLLM_HOST}")
+    print(f"Port:             {LLLM_PORT}")
+    print(f"Quantization:     {LLLM_BITNESS}")
+    print("--------------------------------\n")
+
+    # create and run server
+    server = LocalLLMServer(model_id=LLLM_MODEL_ID, bitness=LLLM_BITNESS)
+    server.run(host=LLLM_HOST, port=LLLM_PORT)
