@@ -1,41 +1,59 @@
 #!/usr/bin/env bash
 set -e
 
+# -------------------------------------
+# Configuration
+# -------------------------------------
 PACKAGE_NAME="laurus_llm"
 DIST_DIR="dist"
 
-# Activate venv if exists
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
-    elif [ -d "venv" ]; then
-    source venv/bin/activate
+# -------------------------------------
+# Environment setup
+# -------------------------------------
+echo "Using current Conda environment: $CONDA_DEFAULT_ENV"
+
+if [ -z "$CONDA_PREFIX" ]; then
+    echo "Error: No Conda environment detected. Please activate a Conda env first."
+    exit 1
 fi
 
-# Ensure build tools
+# Ensure build tools are installed in current Conda env
 pip install --quiet --upgrade pip build wheel setuptools
 
+# -------------------------------------
 # Clean old builds
+# -------------------------------------
+echo "Cleaning old build artifacts..."
 rm -rf build/ "$DIST_DIR"/ *.egg-info
 
-# Build
+# -------------------------------------
+# Build new distribution
+# -------------------------------------
+echo "Building wheel and source distribution..."
 python -m build --wheel --sdist
 
-# Latest wheel
+# -------------------------------------
+# Find latest built wheel
+# -------------------------------------
 WHEEL_FILE=$(ls -t "$DIST_DIR"/*.whl | head -n 1)
+
 if [ -z "$WHEEL_FILE" ]; then
     echo "Build failed: no wheel file found."
     exit 1
 fi
 
-# Only install if not installed or wheel is newer
-INSTALLED_VERSION=$(pip show "$PACKAGE_NAME" | grep Version | awk '{print $2}' || echo "")
-WHEEL_VERSION=$(basename "$WHEEL_FILE" | sed -E "s/^${PACKAGE_NAME}-([0-9\.]+)-.*$/\1/")
+# -------------------------------------
+# Install (upgrade if necessary)
+# -------------------------------------
+echo "Installing $PACKAGE_NAME from $WHEEL_FILE..."
+pip install --upgrade "$WHEEL_FILE"
 
-if [ "$INSTALLED_VERSION" != "$WHEEL_VERSION" ]; then
-    echo "Installing $PACKAGE_NAME version $WHEEL_VERSION..."
-    pip install --upgrade "$WHEEL_FILE"
-else
-    echo "$PACKAGE_NAME version $INSTALLED_VERSION is up-to-date. Skipping install."
-fi
+# -------------------------------------
+# Verify installation
+# -------------------------------------
+echo "Verifying installation..."
+pip show "$PACKAGE_NAME" || echo "Package info not found."
 
-pip show "$PACKAGE_NAME"
+echo ""
+echo "$PACKAGE_NAME successfully built and installed."
+echo "Installed wheel: $WHEEL_FILE"
