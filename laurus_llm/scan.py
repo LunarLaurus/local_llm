@@ -3,25 +3,16 @@ import ast
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# -------------------------
-# Logging setup
-# -------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# -------------------------
-# Configuration
-# -------------------------
 EXCLUDE_FILES = {"__init__.py", "scan.py"}
 EXCLUDE_FOLDERS = {".venv", "__pycache__", "build", "dist", ".git"}
 
 
-# -------------------------
-# AST scanning
-# -------------------------
 def scan_module(file_path):
     """Return top-level classes and functions in a Python file."""
     classes, functions = [], []
@@ -38,13 +29,13 @@ def scan_module(file_path):
     return classes, functions
 
 
-# -------------------------
-# Generate __init__.py
-# -------------------------
 def generate_init_py(folder_path, executor=None, is_root=False):
-    """Generate __init__.py for a folder recursively."""
+    """
+    Generate __init__.py for a folder recursively.
+    Returns all exported names found in this folder and its subfolders.
+    """
     imports = []
-    tasks = []
+    exported_names = []
 
     entries = [e for e in os.listdir(folder_path) if e not in EXCLUDE_FOLDERS]
     py_files = [
@@ -56,61 +47,72 @@ def generate_init_py(folder_path, executor=None, is_root=False):
     ]
     subfolders = [e for e in entries if os.path.isdir(os.path.join(folder_path, e))]
 
-    # Recurse into subfolders first
+    # Recurse into subfolders
     for sub in subfolders:
-        generate_init_py(os.path.join(folder_path, sub), executor=executor)
+        sub_path = os.path.join(folder_path, sub)
+        sub_exports = generate_init_py(sub_path, executor=executor)
+        if sub_exports:
+            imports.append(f"from . import {sub}")
+            exported_names.append(sub)
 
-    # Scan Python files (possibly threaded)
+    # Scan Python files
+    def process_file(f):
+        mod_name = f[:-3]
+        classes, funcs = scan_module(os.path.join(folder_path, f))
+        lines = []
+        names = []
+        for cls in classes:
+            lines.append(f"from .{mod_name} import {cls}")
+            names.append(cls)
+        for func in funcs:
+            lines.append(f"from .{mod_name} import {func}")
+            names.append(func)
+        return lines, names
+
     if executor:
-        futures = {
-            executor.submit(scan_module, os.path.join(folder_path, f)): f
-            for f in py_files
-        }
+        futures = {executor.submit(process_file, f): f for f in py_files}
         for future in as_completed(futures):
-            f = futures[future]
-            mod_name = f[:-3]
-            classes, funcs = future.result()
-            for cls in classes:
-                imports.append(f"from .{mod_name} import {cls}")
-            for func in funcs:
-                imports.append(f"from .{mod_name} import {func}")
+            lines, names = future.result()
+            imports.extend(lines)
+            exported_names.extend(names)
     else:
         for f in py_files:
-            mod_name = f[:-3]
-            classes, funcs = scan_module(os.path.join(folder_path, f))
-            for cls in classes:
-                imports.append(f"from .{mod_name} import {cls}")
-            for func in funcs:
-                imports.append(f"from .{mod_name} import {func}")
+            lines, names = process_file(f)
+            imports.extend(lines)
+            exported_names.extend(names)
 
-    # Write __init__.py only if there are imports or if it's root
+    # Write __init__.py
     init_path = os.path.join(folder_path, "__init__.py")
     try:
         with open(init_path, "w", encoding="utf-8") as f:
-            f.write("# Auto-generated __init__.py\n")
+            # Top comment
+            f.write(f"# Auto-generated __init__.py for folder: {folder_path}\n\n")
+
+            # Write imports
             if imports:
-                f.write("\n".join(imports) + "\n")
-            elif is_root:
-                f.write("# Root package init (empty for now)\n")
+                f.write("\n".join(imports) + "\n\n")
+
+            # Write __all__ if we have any exports
+            if exported_names:
+                f.write("__all__ = [\n")
+                for name in exported_names:
+                    f.write(f"    '{name}',\n")
+                f.write("]\n")
+            else:
+                f.write("# Empty module\n")
         logger.info("Generated %s", init_path)
     except Exception as e:
         logger.error("Failed to write %s: %s", init_path, e)
 
+    return exported_names
 
-# -------------------------
-# Entry point
-# -------------------------
+
 def main():
     root_folder = os.path.dirname(os.path.abspath(__file__))
     logger.info("Scanning and generating __init__.py starting at %s", root_folder)
 
-    # Use threads for faster scanning
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as executor:
-        # Generate subfolder __init__.py first
-        generate_init_py(root_folder, executor=executor, is_root=False)
-
-    # Generate root __init__.py last
-    generate_init_py(root_folder, is_root=True)
+        generate_init_py(root_folder, executor=executor, is_root=True)
 
     logger.info("Done generating __init__.py files.")
 

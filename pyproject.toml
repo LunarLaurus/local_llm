@@ -8,6 +8,7 @@ version = "0.0.3"
 description = "Local LLM server and client"
 requires-python = ">=3.10"
 
+
 dependencies = [
     "fastapi",
     "uvicorn",
@@ -22,3 +23,6 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["laurus_llm*"]
+
+[project.scripts]
+laurus-llm = "laurus_llm.server.app:main"

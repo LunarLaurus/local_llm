@@ -1,15 +1,7 @@
-import logging
 import threading
 from typing import Literal, Optional
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    pipeline,
-    BitsAndBytesConfig,
-)
-from config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
-
-LOG = logging.getLogger("laurus-llm")
+from .config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
+from laurus_llm.lauruslog import LOG
 
 
 class Generator:
@@ -17,6 +9,7 @@ class Generator:
     Wraps a HuggingFace LLM pipeline with configurable bitness, max tokens, and temperature.
     """
 
+    _instance: "Generator" = None  # class-level singleton
     current_mode = {"name": "c", "system_prompt": MODES["c"]}
 
     def __init__(
@@ -119,3 +112,10 @@ class Generator:
         if "Assistant:" in text:
             return text.split("Assistant:")[-1].strip()
         return text.replace(full_prompt, "").strip()
+
+    @classmethod
+    def get_instance(cls) -> "Generator":
+        """Return the singleton instance (create if necessary)."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance

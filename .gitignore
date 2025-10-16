@@ -1,5 +1,9 @@
+/*.db
 /.venv
+/*.db-journal
+*.pyc
+/database
 /build
 /dist
 /laurus_llm.egg-info
-/server/__pycache__
+file_log.txt

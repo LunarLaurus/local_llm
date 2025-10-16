@@ -2,8 +2,7 @@
 import asyncio
 import logging
 from typing import Callable, Any
-
-LOG = logging.getLogger("laurus-llm")
+from laurus_llm.lauruslog import LOG
 
 job_queue: "asyncio.Queue[dict]" = asyncio.Queue()
 jobs: dict = {}

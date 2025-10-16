@@ -1,9 +1,11 @@
 # server/endpoints.py
 import os
 import uuid
-import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from models import (
+
+from laurus_llm.lauruslog import LOG
+from laurus_llm.server.generator import Generator
+from .models import (
     GenerateRequest,
     GenerateResponse,
     JobResultResponse,
@@ -11,11 +13,10 @@ from models import (
     ReloadRequest,
     ShutdownRequest,
 )
-from taskqueue import jobs, jobs_lock, job_queue
-from config import MODES, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
-from generator import generator  # singleton Generator instance
+from .taskqueue import jobs, jobs_lock, job_queue
+from .config import MODES, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
 
-LOG = logging.getLogger("laurus-llm")
+generator = Generator.get_instance()
 
 
 def register_routes(app: FastAPI):
