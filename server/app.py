@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from config import DEFAULT_MODEL_ID
 from taskqueue import init_queue, queue_worker
 from generator import Generator  # class (not the singleton)
-from server import generator as generator_module
+import generator as generator_module
 
 
 LOG = logging.getLogger("laurus-llm")
