@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laurus-local-llm"
+version = "0.0.1"
+description = "Local LLM server and client"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "transformers",
+    "bitsandbytes",
+    "accelerate",
+    "pyyaml",
+    "requests",
+    "pydantic",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
