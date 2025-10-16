@@ -5,22 +5,16 @@ set -e
 # Interactive configuration
 # -------------------------------
 
-# Prompt for model
 read -p "Enter model ID [default: ibm-granite/granite-3b-code-instruct-128k]: " MODEL_ID
 MODEL_ID=${MODEL_ID:-"ibm-granite/granite-3b-code-instruct-128k"}
 
-# Prompt for bitness
 read -p "Enter quantization bitness (4bit / 8bit / 16bit) [default: 16bit]: " BITNESS
 BITNESS=${BITNESS:-"16bit"}
 
-# Prompt for port
 read -p "Enter port [default: 8000]: " PORT
 PORT=${PORT:-8000}
 
-# Network config
 HOST="0.0.0.0"
-
-# Python module path
 MODULE_PATH="laurus_llm.server.app"
 
 # -------------------------------
@@ -31,18 +25,39 @@ if ! command -v conda >/dev/null 2>&1; then
     exit 1
 fi
 
-# Use environment named after current directory
-ENV_NAME=$(basename "$PWD")
+# Initialize conda for bash
+eval "$(conda shell.bash hook)"
 
-if conda env list | grep -qE "^\s*$ENV_NAME\s"; then
+# If no environment active or base is active, prompt user
+CURRENT_ENV=$(conda info --json | jq -r '.active_prefix_name')
+
+if [[ -z "$CURRENT_ENV" || "$CURRENT_ENV" == "base" ]]; then
+    # List environments, skip base
+    echo "Select a Conda environment to activate:"
+    mapfile -t ENV_LIST < <(conda env list | awk '{print $1}' | grep -vE '^(#|base)$')
+    
+    if [[ ${#ENV_LIST[@]} -eq 0 ]]; then
+        echo "No Conda environments found. Please create one first."
+        exit 1
+    fi
+    
+    for i in "${!ENV_LIST[@]}"; do
+        echo "[$i] ${ENV_LIST[$i]}"
+    done
+    
+    read -p "Enter number of environment to activate: " ENV_IDX
+    
+    if [[ -z "${ENV_LIST[$ENV_IDX]}" ]]; then
+        echo "Invalid selection."
+        exit 1
+    fi
+    
+    ENV_NAME="${ENV_LIST[$ENV_IDX]}"
     echo "Activating Conda environment: $ENV_NAME..."
-    # Use conda's "shell hook" to enable activation in bash scripts
-    eval "$(conda shell.bash hook)"
     conda activate "$ENV_NAME"
 else
-    echo "Conda environment '$ENV_NAME' not found. Please create it first:"
-    echo "  conda create -n $ENV_NAME python=3.12"
-    exit 1
+    ENV_NAME="$CURRENT_ENV"
+    echo "Using active Conda environment: $ENV_NAME"
 fi
 
 # -------------------------------
