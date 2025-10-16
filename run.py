@@ -1,4 +1,3 @@
-# install_and_run.py
 import os
 import subprocess
 import sys
