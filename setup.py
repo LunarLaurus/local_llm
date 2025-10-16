@@ -7,7 +7,8 @@ setup(
     install_requires=[
         "fastapi",
         "uvicorn",
-        "transformers" "bitsandbytes",
+        "transformers",
+        "bitsandbytes",
         "accelerate",
         "pyyaml",
         "requests",
