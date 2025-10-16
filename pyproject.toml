@@ -20,4 +20,4 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["client", "server"]
+where = ["laurus_llm"]
