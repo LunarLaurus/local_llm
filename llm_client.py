@@ -56,7 +56,7 @@ class LocalLLMClient:
         start_time = time.time()
         while True:
             r = self.get_result(job_id)
-            if r["status"] in ("done", "error"):
+            if r["status"] in ("done", "error", "cancelled"):
                 return r
             if timeout is not None and (time.time() - start_time) > timeout:
                 raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
@@ -90,6 +90,12 @@ class LocalLLMClient:
         resp = requests.post(
             f"{self.base_url}/shutdown", json={"reason": reason}, timeout=self.timeout
         )
+        resp.raise_for_status()
+        return resp.json()
+
+    # ---------------- Cancel ----------------
+    def cancel(self, job_id: str) -> Dict[str, Any]:
+        resp = requests.post(f"{self.base_url}/cancel/{job_id}", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 

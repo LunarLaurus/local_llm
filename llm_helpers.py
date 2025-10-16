@@ -44,6 +44,8 @@ class LLMWrapper:
         )
         if result["status"] == "done":
             return result["result"]
+        elif result["status"] == "cancelled":
+            raise RuntimeError(f"Job {job_id} was cancelled")
         else:
             raise RuntimeError(f"Job failed: {result.get('error', 'unknown error')}")
 
@@ -68,3 +70,7 @@ class LLMWrapper:
     def shutdown(self, reason: Optional[str] = "requested") -> Dict[str, Any]:
         """Shutdown the server."""
         return self.client.shutdown(reason)
+
+    # ---------------- Cancel ----------------
+    def cancel_job(self, job_id: str) -> Dict[str, Any]:
+        return self.client.cancel(job_id)
