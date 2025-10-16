@@ -21,7 +21,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 
-from config import DEFAULT_MODEL_ID
+from config import DEFAULT_MODEL_ID, MODEL_CHOICES
 from taskqueue import init_queue, queue_worker
 from generator import Generator  # class (not the singleton)
 import generator as generator_module
@@ -125,10 +125,26 @@ if __name__ == "__main__":
 
     LLLM_MODEL_ID = (
         os.environ.get("LLLM_MODEL_ID")
-        or input(
-            "Enter model ID [default: ibm-granite/granite-3b-code-instruct-128k]: "
-        )
-        or "ibm-granite/granite-3b-code-instruct-128k"
+        or (
+            lambda: (
+                print("Select a model:"),
+                print("0. Custom model"),
+                [print(f"{i}. {m}") for i, m in enumerate(MODEL_CHOICES, 1)],
+                (
+                    lambda choice: (
+                        MODEL_CHOICES[int(choice) - 1]
+                        if choice.isdigit() and 1 <= int(choice) <= len(MODEL_CHOICES)
+                        else input("Enter custom model ID: ").strip()
+                        or MODEL_CHOICES[0]
+                    )
+                )(
+                    input(
+                        f"Enter choice [0-{len(MODEL_CHOICES)}] or press Enter for default: "
+                    ).strip()
+                ),
+            )[-1]
+        )()  # call the lambda and take the last tuple element
+        or MODEL_CHOICES[0]
     )
 
     LLLM_BITNESS = (

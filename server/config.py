@@ -23,3 +23,11 @@ MODES = {
     "java": "Concise summarizer for Java code.",
     "cpp": "Concise summarizer for C++ code.",
 }
+
+MODEL_CHOICES = [
+    "ibm-granite/granite-3b-code-instruct-128k",
+    "ibm-granite/granite-8b-code-instruct-128k",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+    "microsoft/wavecoder-ds-6.7b",
+    "ise-uiuc/Magicoder-S-DS-6.7B",
+]
