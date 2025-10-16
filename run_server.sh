@@ -43,6 +43,5 @@ echo ""
 # export variables for the Python script
 export LLLM_MODEL_ID LLLM_BITNESS LLLM_PORT LLLM_HOST
 
-# Run the embedded entrypoint using Python from the Conda env
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-conda run -n "$ENV_NAME" python "$SCRIPT_DIR/server/app.py"
+python "$SCRIPT_DIR/server/app.py"
