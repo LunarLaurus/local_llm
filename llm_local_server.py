@@ -1,11 +1,11 @@
-# local_llm_server_reload.py
+# local_llm_server_reload_v2.py
 """
-FastAPI LLM server with:
-- job queue
-- /generate, /result/{job_id}, /mode, /shutdown
+FastAPI LLM server (improved):
+- job queue (unbounded)
+- /generate, /result/{job_id}, /cancel/{job_id}, /mode, /shutdown
 - /reload: load a new HF model dynamically
 """
-import os, sys, uuid, yaml, logging, asyncio
+import os, uuid, yaml, logging, asyncio
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -16,10 +16,10 @@ from transformers import (
     BitsAndBytesConfig,
 )
 
-LOG = logging.getLogger("local_llm_server_reload")
+LOG = logging.getLogger("local_llm_server_reload_v2")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Local LLM Server (Reloadable)", version="1.1")
+app = FastAPI(title="Local LLM Server (Reloadable)", version="2.0")
 
 
 # ---------------- Config & Defaults ----------------
@@ -34,7 +34,6 @@ cfg = load_config()
 DEFAULT_MODEL_ID = cfg.get("local_model", "mistralai/Mistral-7B-Instruct-v0.2")
 DEFAULT_MAX_TOKENS = int(cfg.get("default_max_tokens", 512))
 DEFAULT_TEMP = float(cfg.get("default_temperature", 0.2))
-QUEUE_MAXSIZE = int(cfg.get("queue_maxsize", 256))
 
 # ---------------- Globals ----------------
 tokenizer = None
@@ -47,10 +46,14 @@ jobs: Dict[str, Dict[str, Any]] = {}
 jobs_lock = asyncio.Lock()
 gen_lock = asyncio.Lock()
 
+# ---------------- Supported modes ----------------
 MODES = {
-    "c": "You are a concise summarizer for C source code. Focus on function purpose, inputs/outputs, types, complexity. Keep responses short.",
-    "asm": "You are a concise summarizer for assembly code. Explain what the code does, registers, side-effects, higher-level constructs. Be succinct.",
-    "file": "You are a file-level summarizer for .c/.h code. Overview file content, key functions, dependencies, risks.",
+    "c": "Concise summarizer for C source code. Focus on function purpose, inputs/outputs, types, complexity.",
+    "asm": "Concise summarizer for assembly code. Explain registers, side-effects, high-level constructs.",
+    "file": "File-level summarizer for code. Overview file content, key functions, dependencies, risks.",
+    "python": "Concise summarizer for Python code. Explain function behavior, inputs, outputs, exceptions.",
+    "java": "Concise summarizer for Java code. Focus on class/method purpose, parameters, return values.",
+    "cpp": "Concise summarizer for C++ code. Highlight functions, types, complexity, and side-effects.",
 }
 current_mode = {"name": "c", "system_prompt": MODES["c"]}
 
@@ -81,7 +84,7 @@ class ModeRequest(BaseModel):
 
 
 class ReloadRequest(BaseModel):
-    model_id: Optional[str] = None  # HF model id to load, default=current
+    model_id: Optional[str] = None
 
 
 class ShutdownRequest(BaseModel):
@@ -94,12 +97,11 @@ async def startup_event():
     global tokenizer, model, generator, job_queue, current_model_id
     LOG.info("Server startup: loading model %s", current_model_id)
     await load_model(current_model_id)
-    job_queue = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
+    job_queue = asyncio.Queue()  # unbounded queue
     asyncio.create_task(queue_worker())
 
 
 async def load_model(model_id: str):
-    """Load a HF model into pipeline"""
     global tokenizer, model, generator, current_model_id
     LOG.info("Loading model: %s", model_id)
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
@@ -135,6 +137,9 @@ async def queue_worker():
         job = await job_queue.get()
         job_id = job["job_id"]
         async with jobs_lock:
+            if jobs[job_id].get("status") == "cancelled":
+                job_queue.task_done()
+                continue
             jobs[job_id]["status"] = "running"
         try:
             loop = asyncio.get_running_loop()
@@ -147,8 +152,9 @@ async def queue_worker():
                 job["temperature"],
             )
             async with jobs_lock:
-                jobs[job_id]["status"] = "done"
-                jobs[job_id]["result"] = result_text
+                if jobs[job_id]["status"] != "cancelled":
+                    jobs[job_id]["status"] = "done"
+                    jobs[job_id]["result"] = result_text
         except Exception as e:
             LOG.exception("Job %s failed", job_id)
             async with jobs_lock:
@@ -203,13 +209,7 @@ async def enqueue_generate(req: GenerateRequest):
     }
     async with jobs_lock:
         jobs[job_id] = job_entry
-    try:
-        job_queue.put_nowait(job_entry)
-    except asyncio.QueueFull:
-        async with jobs_lock:
-            jobs[job_id]["status"] = "error"
-            jobs[job_id]["error"] = "Queue full"
-        raise HTTPException(503, "Queue full")
+    await job_queue.put(job_entry)
     return GenerateResponse(job_id=job_id)
 
 
@@ -224,10 +224,21 @@ async def get_result(job_id: str):
         )
 
 
+@app.post("/cancel/{job_id}")
+async def cancel_job(job_id: str):
+    async with jobs_lock:
+        if job_id not in jobs:
+            raise HTTPException(404, "job_id not found")
+        if jobs[job_id]["status"] in ("done", "error"):
+            raise HTTPException(400, "Cannot cancel completed job")
+        jobs[job_id]["status"] = "cancelled"
+    return {"status": "cancelled", "job_id": job_id}
+
+
 @app.post("/mode")
 async def set_mode(req: ModeRequest):
     mode = req.mode.lower()
-    if mode not in ("c", "asm", "file", "custom"):
+    if mode not in list(MODES.keys()) + ["custom"]:
         raise HTTPException(400, "invalid mode")
     if mode == "custom":
         if not req.custom_system_prompt:
@@ -274,7 +285,7 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    LOG.info("Run: uvicorn local_llm_server_reload:app --host 0.0.0.0 --port 8000")
+    LOG.info("Run: uvicorn local_llm_server_reload_v2:app --host 0.0.0.0 --port 8000")
     uvicorn.run(
-        "local_llm_server_reload:app", host="0.0.0.0", port=8000, log_level="info"
+        "local_llm_server_reload_v2:app", host="0.0.0.0", port=8000, log_level="info"
     )
