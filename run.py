@@ -1,13 +1,14 @@
 import os
 import subprocess
 import sys
+import logging
 
-# Install requirements
+logging.info("Installing application requirements")
 subprocess.check_call(
     [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
 )
 
-# Run server
+logging.info("Running laurus-local-llm server")
 os.execvp(
     "uvicorn",
     ["uvicorn", "local_llm_server_reload:app", "--host", "0.0.0.0", "--port", "8000"],

@@ -16,7 +16,7 @@ from transformers import (
     BitsAndBytesConfig,
 )
 
-LOG = logging.getLogger("local_llm_server_reload_v2")
+LOG = logging.getLogger("laurus-llm")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Local LLM Server (Reloadable)", version="2.0")
