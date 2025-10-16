@@ -6,12 +6,11 @@ from typing import Optional
 
 from fastapi import FastAPI
 
-from .config import DEFAULT_MODEL_ID
-from .queue import init_queue, queue_worker
-from .generator import Generator  # class (not the singleton)
-from . import (
-    generator as generator_module,
-)  # module where endpoints expect `generator` symbol
+from config import DEFAULT_MODEL_ID
+from queue import init_queue, queue_worker
+from generator import Generator  # class (not the singleton)
+from server import generator as generator_module
+
 
 LOG = logging.getLogger("laurus-llm")
 logging.basicConfig(level=logging.INFO)
