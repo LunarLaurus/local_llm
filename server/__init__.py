@@ -13,19 +13,19 @@ Exports:
 """
 
 # core components
-from .generator import Generator
+from generator import Generator
 
 # generator singleton may or may not exist in your package; import safely
 try:
-    from .generator import generator
+    from generator import generator
 except Exception:
     generator = None
 
 # queue primitives
-from .taskqueue import init_queue, job_queue, jobs, jobs_lock, queue_worker
+from taskqueue import init_queue, job_queue, jobs, jobs_lock, queue_worker
 
 # models
-from .models import (
+from models import (
     GenerateRequest,
     GenerateResponse,
     JobResultResponse,
@@ -35,13 +35,13 @@ from .models import (
 )
 
 # config / defaults
-from .config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
+from config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
 
 # endpoints helper (registers routes on a FastAPI app)
-from .endpoints import register_routes
+from endpoints import register_routes
 
 # app helper class for easy programmatic setup
-from .app import LocalLLMServer
+from app import LocalLLMServer
 
 __all__ = [
     "Generator",

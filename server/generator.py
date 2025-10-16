@@ -7,7 +7,7 @@ from transformers import (
     pipeline,
     BitsAndBytesConfig,
 )
-from .config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
+from config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
 
 LOG = logging.getLogger("laurus-llm")
 

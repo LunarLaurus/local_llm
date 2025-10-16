@@ -3,7 +3,7 @@ import os
 import uuid
 import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from .models import (
+from models import (
     GenerateRequest,
     GenerateResponse,
     JobResultResponse,
@@ -11,9 +11,9 @@ from .models import (
     ReloadRequest,
     ShutdownRequest,
 )
-from .queue import jobs, jobs_lock, job_queue
-from .config import MODES, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
-from .generator import generator  # singleton Generator instance
+from taskqueue import jobs, jobs_lock, job_queue
+from config import MODES, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
+from generator import generator  # singleton Generator instance
 
 LOG = logging.getLogger("laurus-llm")
 
