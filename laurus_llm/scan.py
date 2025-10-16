@@ -47,7 +47,7 @@ def generate_init_py(folder_path, executor=None, is_root=False):
     ]
     subfolders = [e for e in entries if os.path.isdir(os.path.join(folder_path, e))]
 
-    # Recurse into subfolders
+    # Recurse into subfolders first
     for sub in subfolders:
         sub_path = os.path.join(folder_path, sub)
         sub_exports = generate_init_py(sub_path, executor=executor)
@@ -85,8 +85,10 @@ def generate_init_py(folder_path, executor=None, is_root=False):
     init_path = os.path.join(folder_path, "__init__.py")
     try:
         with open(init_path, "w", encoding="utf-8") as f:
-            # Top comment
-            f.write(f"# Auto-generated __init__.py for folder: {folder_path}\n\n")
+            # Top comment with folder path
+            f.write(f"# Auto-generated __init__.py for folder: {folder_path}\n")
+            f.write(f"import logging\n")
+            f.write(f"logging.info('Importing {__name__}')\n\n")
 
             # Write imports
             if imports:
@@ -96,6 +98,9 @@ def generate_init_py(folder_path, executor=None, is_root=False):
             if exported_names:
                 f.write("__all__ = [\n")
                 for name in exported_names:
+                    # Skip any 'main' function or symbol
+                    if name.lower() == "main":
+                        continue
                     f.write(f"    '{name}',\n")
                 f.write("]\n")
             else:
