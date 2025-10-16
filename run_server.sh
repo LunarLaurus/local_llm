@@ -30,8 +30,9 @@ eval "$(conda shell.bash hook)"
 # If base is active, or no env is active, prompt for one
 if [[ -z "$CONDA_DEFAULT_ENV" || "$CONDA_DEFAULT_ENV" == "base" ]]; then
     echo "Select a Conda environment to activate (skip base):"
-    # Get all environments, skip base
-    mapfile -t ENV_LIST < <(conda env list | awk '{print $1}' | grep -vE '^(#|base)$')
+    # Get all environments, skip base and empty lines
+    mapfile -t ENV_LIST < <(conda env list | awk '{print $1}' | grep -vE '^(#|base)$' | grep -v '^$')
+    
     
     if [[ ${#ENV_LIST[@]} -eq 0 ]]; then
         echo "No Conda environments found. Please create one first."
