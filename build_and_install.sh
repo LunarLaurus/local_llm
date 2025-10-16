@@ -1,64 +1,41 @@
 #!/usr/bin/env bash
 set -e
 
-# -------------------------------------
-# Configuration
-# -------------------------------------
 PACKAGE_NAME="laurus_llm"
 DIST_DIR="dist"
-
-# -------------------------------------
-# Environment setup
-# -------------------------------------
-echo "Setting up environment..."
 
 # Activate venv if exists
 if [ -d ".venv" ]; then
     source .venv/bin/activate
     elif [ -d "venv" ]; then
     source venv/bin/activate
-else
-    echo "No virtual environment detected."
-    echo "You can create one with: python -m venv .venv && source .venv/bin/activate"
 fi
 
-# Ensure build tools are installed
+# Ensure build tools
 pip install --quiet --upgrade pip build wheel setuptools
 
-# -------------------------------------
 # Clean old builds
-# -------------------------------------
-echo "Cleaning old build artifacts..."
 rm -rf build/ "$DIST_DIR"/ *.egg-info
 
-# -------------------------------------
-# Build new distribution
-# -------------------------------------
-echo "Building wheel and source distribution..."
+# Build
 python -m build --wheel --sdist
 
-# -------------------------------------
-# Find latest built wheel
-# -------------------------------------
+# Latest wheel
 WHEEL_FILE=$(ls -t "$DIST_DIR"/*.whl | head -n 1)
-
 if [ -z "$WHEEL_FILE" ]; then
     echo "Build failed: no wheel file found."
     exit 1
 fi
 
-# -------------------------------------
-# Install (force reinstall)
-# -------------------------------------
-echo "Installing $PACKAGE_NAME from $WHEEL_FILE..."
-pip install --upgrade --force-reinstall "$WHEEL_FILE"
+# Only install if not installed or wheel is newer
+INSTALLED_VERSION=$(pip show "$PACKAGE_NAME" | grep Version | awk '{print $2}' || echo "")
+WHEEL_VERSION=$(basename "$WHEEL_FILE" | sed -E "s/^${PACKAGE_NAME}-([0-9\.]+)-.*$/\1/")
 
-# -------------------------------------
-# Verify installation
-# -------------------------------------
-echo "Verifying installation..."
-pip show "$PACKAGE_NAME" || echo "Package info not found."
+if [ "$INSTALLED_VERSION" != "$WHEEL_VERSION" ]; then
+    echo "Installing $PACKAGE_NAME version $WHEEL_VERSION..."
+    pip install --upgrade "$WHEEL_FILE"
+else
+    echo "$PACKAGE_NAME version $INSTALLED_VERSION is up-to-date. Skipping install."
+fi
 
-echo ""
-echo "$PACKAGE_NAME successfully built and installed."
-echo "Installed wheel: $WHEEL_FILE"
+pip show "$PACKAGE_NAME"
