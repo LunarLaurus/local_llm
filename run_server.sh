@@ -24,8 +24,11 @@ LLLM_BITNESS=${LLLM_BITNESS:-"16bit"}
 read -p "Enter port [default: 8000]: " LLLM_PORT
 LLLM_PORT=${LLLM_PORT:-8000}
 
-LLLM_HOST="0.0.0.0"
+read -p "Enter network address [default: 0.0.0.0]: " LLLM_HOST
+LLLM_HOST=${LLLM_PORT:-"0.0.0.0"}
 
+read -p "Enable acess logging? [default: False]: " LLLM_ACCESS_LOG
+LLLM_ACCESS_LOG=${LLLM_PORT:-False}
 # -------------------------------------
 # Summary
 # -------------------------------------
@@ -37,11 +40,12 @@ echo "Host:             $LLLM_HOST"
 echo "Port:             $LLLM_PORT"
 echo "Quantization:     $LLLM_BITNESS"
 echo "Conda Env:        $ENV_NAME"
+echo "Acess Log:        $LLLM_ACCESS_LOG"
 echo "--------------------------------"
 echo ""
 
 # export variables for the Python script
-export LLLM_MODEL_ID LLLM_BITNESS LLLM_PORT LLLM_HOST
+export LLLM_MODEL_ID LLLM_BITNESS LLLM_PORT LLLM_HOST LLLM_ACCESS_LOG
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 #python "$SCRIPT_DIR/laurus_llm/server/app.py"

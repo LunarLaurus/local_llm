@@ -27,7 +27,7 @@ class Generator:
         self.model = None
         self.pipeline = None
         self._thread_lock = threading.Lock()
-        self.load_model(model_id)
+        # self.load_model(model_id)
 
     def load_model(self, model_id: Optional[str] = None):
         from transformers import (

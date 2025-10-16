@@ -20,6 +20,10 @@ generator = Generator.get_instance()
 
 
 def register_routes(app: FastAPI):
+
+    generator = Generator.get_instance()  # lazy, happens at route registration
+    LOG.info("Registering API routes, generator initialized")
+
     @app.post("/generate", response_model=GenerateResponse)
     async def enqueue_generate(req: GenerateRequest):
         if not req.user_prompt:
