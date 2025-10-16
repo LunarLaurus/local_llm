@@ -53,8 +53,22 @@ class LLMWrapper:
     def set_mode(
         self, mode: str, custom_system_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Switch summarization mode."""
+        """
+        Switch summarization mode.
+            c, asm, file, python, java, cpp, custom
+        """
         return self.client.set_mode(mode, custom_system_prompt)
+
+    def set_custom_prompt(self, system_prompt: str) -> Dict[str, Any]:
+        """
+        Convenience function to set the LLMWrapper to custom mode
+        with a user-defined system prompt.
+
+        :param llm: LLMWrapper instance
+        :param system_prompt: the system prompt to use
+        :return: server response dict
+        """
+        return self.client.set_mode("custom", custom_system_prompt=system_prompt)
 
     # ---------------- Model management ----------------
     def reload_model(self, model_id: Optional[str] = None) -> Dict[str, Any]:

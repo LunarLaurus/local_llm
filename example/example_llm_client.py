@@ -1,4 +1,3 @@
-# example_llm_client.py
 from llm_client import LocalLLMClient
 
 
@@ -6,7 +5,7 @@ def main():
     # Initialize client
     client = LocalLLMClient(base_url="http://localhost:8000", timeout=30.0)
 
-    # Enqueue a job
+    # ---------------- Enqueue a job ----------------
     code_snippet = """
     def fibonacci(n):
         if n <= 1:
@@ -21,26 +20,37 @@ def main():
     )
     print("Job submitted, job_id:", job_id)
 
-    # Wait for result
-    result = client.wait_for_result(job_id, poll_interval=1.0, timeout=30.0)
-    if result["status"] == "done":
-        print("Job completed! Result:", result["result"])
-    else:
-        print("Job failed:", result.get("error"))
+    # ---------------- Wait for result ----------------
+    try:
+        result = client.wait_for_result(job_id, poll_interval=1.0, timeout=30.0)
+        if result["status"] == "done":
+            print("Job completed! Result:\n", result["result"])
+        elif result["status"] == "cancelled":
+            print("Job was cancelled.")
+        else:
+            print("Job failed:", result.get("error"))
+    except TimeoutError as e:
+        print("Timeout:", e)
+        # Example: cancel the job if it timed out
+        cancel_resp = client.cancel(job_id)
+        print("Cancelled job response:", cancel_resp)
 
-    # Change mode
-    mode_resp = client.set_mode("code_summary")
-    print("Mode set response:", mode_resp)
+    # ---------------- Set custom mode ----------------
+    custom_prompt = (
+        "You are a Python code expert. Explain the function clearly and concisely."
+    )
+    mode_resp = client.set_mode("custom", custom_system_prompt=custom_prompt)
+    print("Custom mode set response:", mode_resp)
 
-    # Reload model
+    # ---------------- Reload model ----------------
     reload_resp = client.reload_model()
     print("Reload response:", reload_resp)
 
-    # Check health
+    # ---------------- Check health ----------------
     health_resp = client.health()
     print("Server health:", health_resp)
 
-    # Shutdown server (optional)
+    # ---------------- Optional: Shutdown ----------------
     # shutdown_resp = client.shutdown("Finished example")
     # print("Shutdown response:", shutdown_resp)
 
