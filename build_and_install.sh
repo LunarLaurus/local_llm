@@ -2,23 +2,22 @@
 set -e
 
 # -------------------------------------
+# Load common Conda functions
+# -------------------------------------
+source "$(dirname "$0")/conda.sh"
+
+# -------------------------------------
+# Run Conda checks
+# -------------------------------------
+check_conda
+select_conda_env
+ensure_build_tools
+
+# -------------------------------------
 # Configuration
 # -------------------------------------
 PACKAGE_NAME="laurus_llm"
 DIST_DIR="dist"
-
-# -------------------------------------
-# Environment setup
-# -------------------------------------
-echo "Using current Conda environment: $CONDA_DEFAULT_ENV"
-
-if [ -z "$CONDA_PREFIX" ]; then
-    echo "Error: No Conda environment detected. Please activate a Conda env first."
-    exit 1
-fi
-
-# Ensure build tools are installed in current Conda env
-pip install --quiet --upgrade pip build wheel setuptools
 
 # -------------------------------------
 # Clean old builds
@@ -33,18 +32,14 @@ echo "Building wheel and source distribution..."
 python -m build --wheel --sdist
 
 # -------------------------------------
-# Find latest built wheel
+# Install wheel
 # -------------------------------------
 WHEEL_FILE=$(ls -t "$DIST_DIR"/*.whl | head -n 1)
-
 if [ -z "$WHEEL_FILE" ]; then
     echo "Build failed: no wheel file found."
     exit 1
 fi
 
-# -------------------------------------
-# Install (upgrade if necessary)
-# -------------------------------------
 echo "Installing $PACKAGE_NAME from $WHEEL_FILE..."
 pip install --upgrade "$WHEEL_FILE"
 
