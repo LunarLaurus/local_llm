@@ -22,7 +22,7 @@ except Exception:
     generator = None
 
 # queue primitives
-from .queue import init_queue, job_queue, jobs, jobs_lock, queue_worker
+from .taskqueue import init_queue, job_queue, jobs, jobs_lock, queue_worker
 
 # models
 from .models import (
