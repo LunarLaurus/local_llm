@@ -4,7 +4,6 @@ set -e
 # -------------------------------
 # Interactive configuration
 # -------------------------------
-
 read -p "Enter model ID [default: ibm-granite/granite-3b-code-instruct-128k]: " MODEL_ID
 MODEL_ID=${MODEL_ID:-"ibm-granite/granite-3b-code-instruct-128k"}
 
@@ -28,12 +27,10 @@ fi
 # Initialize conda for bash
 eval "$(conda shell.bash hook)"
 
-# If no environment active or base is active, prompt user
-CURRENT_ENV=$(conda info --json | jq -r '.active_prefix_name')
-
-if [[ -z "$CURRENT_ENV" || "$CURRENT_ENV" == "base" ]]; then
-    # List environments, skip base
-    echo "Select a Conda environment to activate:"
+# If base is active, or no env is active, prompt for one
+if [[ -z "$CONDA_DEFAULT_ENV" || "$CONDA_DEFAULT_ENV" == "base" ]]; then
+    echo "Select a Conda environment to activate (skip base):"
+    # Get all environments, skip base
     mapfile -t ENV_LIST < <(conda env list | awk '{print $1}' | grep -vE '^(#|base)$')
     
     if [[ ${#ENV_LIST[@]} -eq 0 ]]; then
@@ -45,18 +42,18 @@ if [[ -z "$CURRENT_ENV" || "$CURRENT_ENV" == "base" ]]; then
         echo "[$i] ${ENV_LIST[$i]}"
     done
     
-    read -p "Enter number of environment to activate: " ENV_IDX
+    read -p "Enter the number of the environment to use: " ENV_IDX
+    ENV_NAME="${ENV_LIST[$ENV_IDX]}"
     
-    if [[ -z "${ENV_LIST[$ENV_IDX]}" ]]; then
+    if [[ -z "$ENV_NAME" ]]; then
         echo "Invalid selection."
         exit 1
     fi
     
-    ENV_NAME="${ENV_LIST[$ENV_IDX]}"
-    echo "Activating Conda environment: $ENV_NAME..."
+    echo "Activating Conda environment: $ENV_NAME"
     conda activate "$ENV_NAME"
 else
-    ENV_NAME="$CURRENT_ENV"
+    ENV_NAME="$CONDA_DEFAULT_ENV"
     echo "Using active Conda environment: $ENV_NAME"
 fi
 
