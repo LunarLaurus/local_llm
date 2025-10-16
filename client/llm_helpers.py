@@ -1,4 +1,4 @@
-from llm_client import LocalLLMClient
+from client.llm_client import LocalLLMClient
 from typing import Optional, Dict, Any
 
 
