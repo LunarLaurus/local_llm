@@ -1,7 +1,6 @@
 fastapi
 uvicorn
 transformers
-torch
 bitsandbytes
 accelerate
 pyyaml
