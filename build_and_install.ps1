@@ -26,7 +26,7 @@ python -m build --wheel --sdist
 # -------------------------------------
 # Install wheel
 # -------------------------------------
-$wheelFiles = Get-ChildItem -Path $DIST_DIR -Filter "*.whl" | Sort-Object LastWriteTime -Descending
+$wheelFiles = @(Get-ChildItem -Path $DIST_DIR -Filter "*.whl" | Sort-Object LastWriteTime -Descending)
 if ($wheelFiles.Count -eq 0) {
     Write-Error "Build failed: no wheel file found."
     exit 1
@@ -35,6 +35,7 @@ $WHEEL_FILE = $wheelFiles[0].FullName
 
 Write-Host "Installing $PACKAGE_NAME from $WHEEL_FILE..."
 pip install --upgrade $WHEEL_FILE
+
 
 # -------------------------------------
 # Verify installation
