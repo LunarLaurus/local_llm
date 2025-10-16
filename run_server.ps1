@@ -11,7 +11,7 @@ $PORT = Read-Host "Enter port [default: 8000]"
 if ([string]::IsNullOrWhiteSpace($PORT)) { $PORT = 8000 }
 
 $HOST_ADDRESS = Read-Host "Enter network address [default: 0.0.0.0]"
-if ([string]::IsNullOrWhiteSpace($HOST)) { $HOST_ADDRESS = "0.0.0.0" }
+if ([string]::IsNullOrWhiteSpace($HOST_ADDRESS)) { $HOST_ADDRESS = "0.0.0.0" }
 
 $ACCESS_LOG = Read-Host "Enable access logging? [default: False]"
 if ([string]::IsNullOrWhiteSpace($ACCESS_LOG)) { $ACCESS_LOG = $false }

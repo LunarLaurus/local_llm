@@ -1,4 +1,5 @@
 import asyncio
+import os
 import threading
 from typing import Optional
 
@@ -87,8 +88,17 @@ class LocalLLMServer:
         )
 
 
-def input_with_timeout(prompt: str, timeout: int, default: str) -> str:
-    """Prompt the user for input with a timeout. Returns default if timeout expires."""
+def input_with_timeout(prompt: str, timeout: int, default: str, env_key: str) -> str:
+    """
+    Prompt the user for input with a timeout. Returns the environment variable
+    if set, otherwise waits for user input, or defaults if timeout expires.
+    """
+    # Check environment variable first
+    env = os.environ.get(env_key)
+    if env is not None and env.strip():
+        return env.strip()
+
+    # Use a mutable container to store the result from the thread
     result = [default]
 
     def _input():
@@ -99,10 +109,11 @@ def input_with_timeout(prompt: str, timeout: int, default: str) -> str:
         except Exception:
             pass
 
+    # Start input thread
     thread = threading.Thread(target=_input)
     thread.daemon = True
     thread.start()
-    thread.join(timeout)
+    thread.join(timeout)  # wait for timeout seconds
     return result[0]
 
 
@@ -115,17 +126,22 @@ def main():
         "(30s) Enter model ID [default: ibm-granite/granite-3b-code-instruct-128k]: ",
         timeout=30,
         default="ibm-granite/granite-3b-code-instruct-128k",
+        env_key="LLLM_MODEL_ID",
     )
 
     LLLM_BITNESS = input_with_timeout(
         "(10s) Enter quantization bitness (4bit / 8bit / 16bit) [default: 16bit]: ",
         timeout=10,
         default="16bit",
+        env_key="LLLM_BITNESS",
     )
 
     LLLM_PORT = int(
         input_with_timeout(
-            "(10s) Enter port [default: 8000]: ", timeout=10, default="8000"
+            "(10s) Enter port [default: 8000]: ",
+            timeout=10,
+            default="8000",
+            env_key="LLLM_PORT",
         )
     )
 
@@ -133,12 +149,14 @@ def main():
         "(10s) Enter network address [default: 0.0.0.0]: ",
         timeout=10,
         default="0.0.0.0",
+        env_key="LLLM_HOST",
     )
 
     LLLM_ACCESS_LOG = input_with_timeout(
         "(5s) Enable access logging? To enable type: yes/true/t/y/ok [default: False]: ",
         timeout=5,
         default="False",
+        env_key="LLLM_ACCESS_LOG",
     ).lower() in ("1", "true", "yes", "y", "t", "ok")
 
     print("\n--------------------------------")

@@ -25,7 +25,7 @@ read -p "Enter port [default: 8000]: " LLLM_PORT
 LLLM_PORT=${LLLM_PORT:-8000}
 
 read -p "Enter network address [default: 0.0.0.0]: " LLLM_HOST
-LLLM_HOST=${LLLM_PORT:-"0.0.0.0"}
+LLLM_HOST=${LLLM_HOST:-"0.0.0.0"}
 
 read -p "Enable acess logging? [default: False]: " LLLM_ACCESS_LOG
 LLLM_ACCESS_LOG=${LLLM_PORT:-False}
