@@ -20,4 +20,5 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["laurus_llm"]
+where = ["."]
+include = ["laurus_llm*"]
