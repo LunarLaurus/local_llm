@@ -1,4 +1,4 @@
-# laurus_local_llm/server/__init__.py
+# laurus_llm/server/__init__.py
 """
 Server package public API.
 
