@@ -5,16 +5,17 @@ from typing import Callable, Any
 
 LOG = logging.getLogger("laurus-llm")
 
-job_queue: "asyncio.Queue[dict]" = None
+job_queue: "asyncio.Queue[dict]" = asyncio.Queue()
 jobs: dict = {}
 jobs_lock = asyncio.Lock()
 gen_lock = asyncio.Lock()
 
 
 def init_queue():
-    """Initialize the global job_queue. Call at startup."""
+    """Re-initialize the global job_queue if needed."""
     global job_queue
     job_queue = asyncio.Queue()
+    LOG.info("Job queue re-initialized")
 
 
 async def queue_worker(generator_fn: Callable[..., str]):

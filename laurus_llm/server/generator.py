@@ -7,7 +7,7 @@ from transformers import (
     pipeline,
     BitsAndBytesConfig,
 )
-from config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP
+from config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
 
 LOG = logging.getLogger("laurus-llm")
 
@@ -16,6 +16,8 @@ class Generator:
     """
     Wraps a HuggingFace LLM pipeline with configurable bitness, max tokens, and temperature.
     """
+
+    current_mode = {"name": "c", "system_prompt": MODES["c"]}
 
     def __init__(
         self,
