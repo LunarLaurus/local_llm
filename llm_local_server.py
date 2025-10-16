@@ -30,8 +30,13 @@ def load_config(path: str = "config.yaml") -> dict:
     return {}
 
 
+# microsoft/wavecoder-ds-6.7b
+# mistralai/Mistral-7B-Instruct-v0.3
+# ise-uiuc/Magicoder-S-DS-6.7B
+# ibm-granite/granite-8b-code-instruct-128k
+
 cfg = load_config()
-DEFAULT_MODEL_ID = cfg.get("local_model", "mistralai/Mistral-7B-Instruct-v0.2")
+DEFAULT_MODEL_ID = cfg.get("local_model", "ibm-granite/granite-3b-code-instruct-128k")
 DEFAULT_MAX_TOKENS = int(cfg.get("default_max_tokens", 512))
 DEFAULT_TEMP = float(cfg.get("default_temperature", 0.2))
 
