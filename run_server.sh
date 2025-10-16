@@ -11,7 +11,7 @@ MODEL_ID=${MODEL_ID:-"ibm-granite/granite-3b-code-instruct-128k"}
 
 # Prompt for bitness
 read -p "Enter quantization bitness (4bit / 8bit / 16bit) [default: 4bit]: " BITNESS
-BITNESS=${BITNESS:-"4bit"}
+BITNESS=${BITNESS:-"16bit"}
 
 # Prompt for port
 read -p "Enter port [default: 8000]: " PORT
@@ -38,10 +38,10 @@ fi
 echo ""
 echo "--------------------------------"
 echo "Starting Local LLM Server"
-echo "Model:       $MODEL_ID"
-echo "Quantization: $BITNESS"
-echo "Host:        $HOST"
-echo "Port:        $PORT"
+echo "Model:            $MODEL_ID"
+echo "Host:             $HOST"
+echo "Port:             $PORT"
+echo "Quantization:     $BITNESS"
 echo "--------------------------------"
 echo ""
 
