@@ -285,5 +285,5 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    LOG.info("Run: uvicorn local_llm_server:app --host 0.0.0.0 --port 8000")
-    uvicorn.run("local_llm_server:app", host="0.0.0.0", port=8000, log_level="info")
+    LOG.info("Run: uvicorn llm_local_server:app --host 0.0.0.0 --port 8000")
+    uvicorn.run("llm_local_server:app", host="0.0.0.0", port=8000, log_level="info")

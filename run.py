@@ -8,8 +8,8 @@ subprocess.check_call(
     [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
 )
 
-logging.info("Running local_llm_server server")
+logging.info("Running llm_local_server server")
 os.execvp(
     "uvicorn",
-    ["uvicorn", "local_llm_server:app", "--host", "0.0.0.0", "--port", "8000"],
+    ["uvicorn", "llm_local_server:app", "--host", "0.0.0.0", "--port", "8000"],
 )
