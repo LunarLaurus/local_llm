@@ -2,3 +2,4 @@
 /build
 /dist
 /laurus_llm.egg-info
+/server/__pycache__

@@ -2,6 +2,21 @@
 import logging
 import asyncio
 import importlib
+import os
+import sys
+
+LOG = logging.getLogger("laurus-llm")
+logging.basicConfig(level=logging.INFO)
+
+# If run as script, fix __package__ for relative imports
+if __name__ == "__main__" and __package__ is None:
+    LOG.info("Computing package name dynamically based on file location.")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    sys.path.insert(0, parent_dir)  # allow imports from parent
+    __package__ = "server"  # replace with your package name
+
+
 from typing import Optional
 
 from fastapi import FastAPI
@@ -10,10 +25,6 @@ from config import DEFAULT_MODEL_ID
 from taskqueue import init_queue, queue_worker
 from generator import Generator  # class (not the singleton)
 import generator as generator_module
-
-
-LOG = logging.getLogger("laurus-llm")
-logging.basicConfig(level=logging.INFO)
 
 
 class LocalLLMServer:
