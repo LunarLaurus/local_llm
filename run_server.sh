@@ -43,7 +43,8 @@ echo ""
 # -------------------------------------
 # Run server
 # -------------------------------------
-exec python - <<PYCODE
+# Run server using the Python from the selected Conda env
+conda run -n "$ENV_NAME" python - <<PYCODE
 from laurus_llm.server.app import LocalLLMServer
 import uvicorn
 
@@ -51,3 +52,4 @@ server = LocalLLMServer(model_id="${MODEL_ID}", bitness="${BITNESS}")
 app = server.get_app()
 uvicorn.run(app, host="${HOST}", port=${PORT})
 PYCODE
+
