@@ -34,10 +34,13 @@ select_conda_env() {
     fi
     
     # List environments excluding base
-    mapfile -t ENV_LIST < <(conda env list \
+    mapfile -t ENV_LIST < <(
+        conda env list \
         | awk 'NR>2 {gsub(/\*/,""); print $1}' \
         | grep -v "^$CONDA_EXCLUDE_ENV$" \
-    | grep -v "^$" )
+        | grep -v "^#" \
+        | grep -v "^$"
+    )
     
     if [ ${#ENV_LIST[@]} -eq 0 ]; then
         echo "No Conda environments found besides $CONDA_EXCLUDE_ENV. Please create one first."
