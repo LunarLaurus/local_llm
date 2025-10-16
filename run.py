@@ -11,5 +11,5 @@ subprocess.check_call(
 logging.info("Running laurus-local-llm server")
 os.execvp(
     "uvicorn",
-    ["uvicorn", "local_llm_server_reload:app", "--host", "0.0.0.0", "--port", "8000"],
+    ["uvicorn", "laurus-local-llm:app", "--host", "0.0.0.0", "--port", "8000"],
 )
