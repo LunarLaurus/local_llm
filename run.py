@@ -8,8 +8,8 @@ subprocess.check_call(
     [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
 )
 
-logging.info("Running laurus-local-llm server")
+logging.info("Running local_llm_server server")
 os.execvp(
     "uvicorn",
-    ["uvicorn", "laurus-local-llm:app", "--host", "0.0.0.0", "--port", "8000"],
+    ["uvicorn", "local_llm_server:app", "--host", "0.0.0.0", "--port", "8000"],
 )
