@@ -65,7 +65,7 @@ class Generator:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
                     device_map="auto",
-                    torch_dtype="auto",
+                    dtype="auto",
                     trust_remote_code=True,
                 )
                 LOG.info("Loaded full precision model")
@@ -76,7 +76,7 @@ class Generator:
                 e,
             )
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, device_map="auto", torch_dtype="auto", trust_remote_code=True
+                model_id, device_map="auto", dtype="auto", trust_remote_code=True
             )
 
         self.pipeline = pipeline(
