@@ -7,9 +7,10 @@ from laurus_llm.lauruslog import LOG
 class Generator:
     """
     Wraps a HuggingFace LLM pipeline with configurable bitness, max tokens, and temperature.
+    Supports a singleton instance for global access.
     """
 
-    _instance: "Generator" = None  # class-level singleton
+    _instance: "Generator" = None
     current_mode = {"name": "c", "system_prompt": MODES["c"]}
 
     def __init__(
@@ -27,9 +28,9 @@ class Generator:
         self.model = None
         self.pipeline = None
         self._thread_lock = threading.Lock()
-        # self.load_model(model_id)
 
     def load_model(self, model_id: Optional[str] = None):
+        """Load HuggingFace model and tokenizer based on bitness."""
         from transformers import (
             AutoTokenizer,
             AutoModelForCausalLM,
@@ -41,6 +42,7 @@ class Generator:
         LOG.info("Loading model %s with %s", model_id, self.bitness)
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+
         try:
             if self.bitness == "4bit":
                 bnb_config = BitsAndBytesConfig(load_in_4bit=True)
@@ -61,12 +63,8 @@ class Generator:
                 )
                 LOG.info("Loaded 8-bit quantized model")
             else:
-                # 16bit / default
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    device_map="auto",
-                    dtype="auto",
-                    trust_remote_code=True,
+                    model_id, device_map="auto", dtype="auto", trust_remote_code=True
                 )
                 LOG.info("Loaded full precision model")
         except Exception as e:
@@ -96,6 +94,7 @@ class Generator:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> str:
+        """Thread-safe text generation."""
         full_prompt = f"{system_prompt or ''}\n\nUser:\n{user_prompt}\n\nAssistant:"
         max_new_tokens = max(1, min(2000, int(max_tokens or self.max_tokens)))
         temp = float(temperature if temperature is not None else self.temperature)
@@ -108,6 +107,7 @@ class Generator:
                 temperature=temp,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
+
         text = outputs[0].get("generated_text", "")
         if "Assistant:" in text:
             return text.split("Assistant:")[-1].strip()
@@ -115,7 +115,7 @@ class Generator:
 
     @classmethod
     def get_instance(cls) -> "Generator":
-        """Return the singleton instance (create if necessary)."""
+        """Return the singleton instance, creating it if necessary."""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
