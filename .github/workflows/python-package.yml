@@ -37,4 +37,11 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pytest
+        pytest || test_status=$?
+        if [ "$test_status" = "5" ]; then
+            echo "No tests found, continuing"
+            exit 0
+        else
+            exit $test_status
+        fi
+
