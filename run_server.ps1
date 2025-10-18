@@ -55,4 +55,4 @@ else {
 # -------------------------------------
 # Run the Python server
 # -------------------------------------
-python -m laurus_llm.server.app
+python -m laurus_llm.app

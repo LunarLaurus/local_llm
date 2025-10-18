@@ -1,17 +1,19 @@
-# logger.py
+# laurus_llm_client/lauruslog.py
 import logging
 
 
 class LaurusLogger:
     """
-    Centralized logger for the Local LLM server.
+    Centralized logger for the client library.
     Use:
-        from logger import LOG
+        from laurus_llm_client.lauruslog import LOG
         LOG.info("Message")
     """
 
     @staticmethod
-    def get_logger(name="laurus-llm", level=logging.INFO, suppress_uvicorn_access=True):
+    def get_logger(
+        name="laurus-llm-client", level=logging.INFO, suppress_uvicorn_access=True
+    ):
         logger = logging.getLogger(name)
         logger.setLevel(level)
 
@@ -25,12 +27,12 @@ class LaurusLogger:
 
         logger.propagate = False  # prevent double logging
 
-        # Optionally suppress uvicorn access logs
+        # Optionally suppress uvicorn access logs (if library used in server context)
         if suppress_uvicorn_access:
             uvicorn_loggers = ["uvicorn.access"]
             for ul in uvicorn_loggers:
                 ulog = logging.getLogger(ul)
-                ulog.setLevel(logging.WARNING)  # only warnings+ show
+                ulog.setLevel(logging.WARNING)
                 ulog.propagate = False
 
         return logger

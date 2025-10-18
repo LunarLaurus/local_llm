@@ -5,16 +5,16 @@ from typing import Optional
 from fastapi import FastAPI
 
 from laurus_llm.lauruslog import LOG
-from laurus_llm.server.config import DEFAULT_MODEL_ID
-from laurus_llm.server.taskqueue import (
+from laurus_llm.config import DEFAULT_MODEL_ID
+from laurus_llm.taskqueue import (
     init_queue,
     start_workers,
     stop_workers,
     enqueue_job,
 )
-from laurus_llm.server.generator import Generator
-import laurus_llm.server.generator as generator_module
-from laurus_llm.server import endpoints
+from laurus_llm.generator import Generator
+import laurus_llm.generator as generator_module
+from laurus_llm import endpoints
 
 
 # -----------------------------

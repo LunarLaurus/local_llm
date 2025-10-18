@@ -5,7 +5,7 @@ import asyncio
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 
 from laurus_llm.lauruslog import LOG
-from laurus_llm.server.generator import Generator
+from laurus_llm.generator import Generator
 from .models import (
     GenerateRequest,
     GenerateResponse,
