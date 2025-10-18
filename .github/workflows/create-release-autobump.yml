@@ -51,9 +51,11 @@ jobs:
 
       - name: Generate Changelog
         id: changelog
-        uses: mikeal/generate-changelog@v1
+        uses: janheinrichmerker/action-github-changelog-generator@v2.4
         with:
           tag_prefix: "v"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          output: "CHANGELOG.md" # write to CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
