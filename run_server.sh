@@ -49,4 +49,4 @@ export LLLM_MODEL_ID LLLM_BITNESS LLLM_PORT LLLM_HOST LLLM_ACCESS_LOG
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 #python "$SCRIPT_DIR/laurus_llm/server/app.py"
-python -m laurus_llm.server.app
+python -m laurus_llm.app

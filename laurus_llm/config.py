@@ -25,9 +25,16 @@ MODES = {
 }
 
 MODEL_CHOICES = [
+    # Core large models
     "ibm-granite/granite-3b-code-instruct-128k",
     "ibm-granite/granite-8b-code-instruct-128k",
     "mistralai/Mistral-7B-Instruct-v0.3",
     "microsoft/wavecoder-ds-6.7b",
     "ise-uiuc/Magicoder-S-DS-6.7B",
+    # Compact chat/code models
+    "StabilityAI/stable-code-instruct-3b",
+    "microsoft/Phi-3-mini-128k-instruct",
+    "google/gemma-2-2b-it",
+    "meta-llama/Llama-3.2-3B-Instruct",
+    "mistralai/Mistral-3B-Instruct",
 ]

@@ -1,13 +1,48 @@
-# Auto-generated __init__.py for folder: C:\Users\User\Documents\coding\bash\local-llm\laurus_llm
-import logging
-logging.info('Importing laurus_llm')
+# laurus_llm/__init__.py (explicit)
+"""laurus_llm — direct exports (eager imports)."""
 
 from . import client
-from . import server
+from .app import LocalLLMServer, create_app, app, input_with_timeout, prompt_bool
+from .endpoints import register_routes
+from .generator import Generator
+from .models import (
+    GenerateRequest,
+    GenerateResponse,
+    JobResultResponse,
+    ModeRequest,
+    ReloadRequest,
+    ShutdownRequest,
+)
+from .taskqueue import (
+    init_queue,
+    enqueue_job,
+    start_workers,
+    stop_workers,
+    _worker_loop,
+)
 from .lauruslog import LaurusLogger
 
 __all__ = [
-    'client',
-    'server',
-    'LaurusLogger',
+    "client",
+    "LocalLLMServer",
+    "create_app",
+    "app",
+    "input_with_timeout",
+    "prompt_bool",
+    "register_routes",
+    "Generator",
+    "GenerateRequest",
+    "GenerateResponse",
+    "JobResultResponse",
+    "ModeRequest",
+    "ReloadRequest",
+    "ShutdownRequest",
+    "init_queue",
+    "enqueue_job",
+    "start_workers",
+    "stop_workers",
+    "_worker_loop",
+    "LaurusLogger",
 ]
+
+__version__ = "0.0.3"
