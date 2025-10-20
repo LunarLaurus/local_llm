@@ -314,7 +314,7 @@ async def start_server_instances(
         cmd = []
         if taskset_path:
             cmd += [taskset_path, "-c", f"{start_core}-{end_core}"]
-        cmd += [sys.executable, "-u", "-m", "server.app"]
+        cmd += [sys.executable, "-u", "-m", "laurus_llm.app"]
 
         LOG.info(
             "Starting server %d on port %d cores %d-%d", i, port, start_core, end_core
