@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-start_cluster.py - Improved for Ubuntu
+start_cluster.py - Refactored Cluster Manager
 
-- Staggered backend startup to avoid disk/network congestion
-- Wait for model load before marking backends ready
+- Staggered backend startup
+- Wait for model load and queue readiness
 - Async least-connections load balancer
-- Full logging of backend stdout/stderr
+- Full logging, graceful shutdown
 """
 
 import argparse
@@ -28,23 +28,24 @@ logging.basicConfig(
 LOG = logging.getLogger("start_cluster")
 
 
+# ----------------------------
+# Stream reader for subprocess output
+# ----------------------------
 async def read_stream(name: str, stream: asyncio.StreamReader):
-    """
-    Read from a process stream (stdout or stderr) safely in a single coroutine.
-    Logs each line with the backend name.
-    """
     try:
         while True:
             line = await stream.readline()
             if not line:
                 break
             LOG.info("[%s] %s", name, line.decode(errors="ignore").rstrip())
+    except asyncio.CancelledError:
+        return
     except Exception as e:
         LOG.warning("[%s] stream read error: %s", name, e)
 
 
 # ----------------------------
-# Async proxy (least-connections)
+# Backend / Load Balancer
 # ----------------------------
 class Backend:
     def __init__(self, url: str, max_concurrency: int):
@@ -76,7 +77,6 @@ class AsyncLoadBalancer:
 
         self.connector = TCPConnector(limit=0, limit_per_host=0, ttl_dns_cache=300)
         self.session = ClientSession(connector=self.connector)
-
         self._stop = asyncio.Event()
         self.total_requests = 0
         self.total_errors = 0
@@ -126,12 +126,13 @@ class AsyncLoadBalancer:
         while attempt <= self.retries:
             b = self.choose_backend()
             if b.active >= b.max_concurrency:
-                await asyncio.sleep(0.01 * (attempt + 1))
+                await asyncio.sleep(0.01 * (2**attempt))
                 attempt += 1
                 continue
 
             async with b.lock:
                 b.active += 1
+            start = asyncio.get_event_loop().time()
             try:
                 target = f"{b.url}{request.rel_url}"
                 headers = dict(request.headers)
@@ -169,6 +170,8 @@ class AsyncLoadBalancer:
                     async for chunk in resp.content.iter_chunked(64 * 1024):
                         await response.write(chunk)
                     await response.write_eof()
+                    latency = asyncio.get_event_loop().time() - start
+                    LOG.info("Proxied request to %s in %.3fs", b.url, latency)
                     return response
             except Exception as e:
                 LOG.warning("Proxy error to %s: %s", b.url, e)
@@ -221,61 +224,68 @@ class AsyncLoadBalancer:
 
 
 # ----------------------------
-# Utilities
+# Backend readiness
 # ----------------------------
-async def wait_for_http(url: str, timeout: float = 1.0, tries: int = 60) -> bool:
+async def wait_for_backend_ready(
+    url: str, timeout: float = 1.0, tries: int = 60
+) -> bool:
     import aiohttp
 
     for _ in range(tries):
         try:
             async with aiohttp.ClientSession() as s:
-                async with s.get(url, timeout=timeout) as r:
+                async with s.get(f"{url}/health", timeout=timeout) as r:
                     if r.status < 500:
-                        return True
+                        data = await r.json()
+                        if data.get("model_loaded"):
+                            return True
         except Exception:
             await asyncio.sleep(1)
     return False
 
 
+async def monitor_procs_ready(procs_ports, host, tries=60):
+    ready = []
+    for _proc, port in procs_ports:
+        url = f"http://{host}:{port}"
+        ok = await wait_for_backend_ready(url, tries=tries)
+        LOG.info("Server on port %d ready: %s", port, ok)
+        ready.append(ok)
+    return all(ready)
+
+
+# ----------------------------
+# Model pre-download
+# ----------------------------
 def predownload_model(model_id: str, bitness: str):
-    """
-    Pre-download the HuggingFace model and tokenizer to populate the cache.
-    Call this before starting backend processes to avoid multiple simultaneous downloads.
-    """
     from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
     import logging
 
     logger = logging.getLogger("predownload")
     logger.info("Pre-downloading model %s (%s)...", model_id, bitness)
-
-    tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
-
+    AutoTokenizer.from_pretrained(model_id, use_fast=True)
     try:
         if bitness == "4bit":
             bnb_config = BitsAndBytesConfig(load_in_4bit=True)
             AutoModelForCausalLM.from_pretrained(
-                model_id,
-                quantization_config=bnb_config,
-                trust_remote_code=True,
+                model_id, quantization_config=bnb_config, trust_remote_code=True
             )
         elif bitness == "8bit":
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
             AutoModelForCausalLM.from_pretrained(
-                model_id,
-                quantization_config=bnb_config,
-                trust_remote_code=True,
+                model_id, quantization_config=bnb_config, trust_remote_code=True
             )
-        else:  # full precision
+        else:
             AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True)
     except Exception as e:
-        logger.warning(
-            "Failed to pre-download with %s, falling back to float16: %s", bitness, e
-        )
+        logger.warning("Failed pre-download with %s, falling back: %s", bitness, e)
         AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True)
-
     logger.info("Pre-download complete for %s", model_id)
 
 
+# ----------------------------
+# Start server instances
+# ----------------------------
 async def start_server_instances(
     num: int,
     base_port: int,
@@ -320,7 +330,6 @@ async def start_server_instances(
         LOG.info(
             "Starting server %d on port %d cores %d-%d", i, port, start_core, end_core
         )
-        # start subprocess
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             env=env,
@@ -328,7 +337,6 @@ async def start_server_instances(
             stderr=asyncio.subprocess.PIPE,
         )
 
-        # Start one reader per stream
         asyncio.create_task(read_stream(f"proc-{port}-stdout", proc.stdout))
         asyncio.create_task(read_stream(f"proc-{port}-stderr", proc.stderr))
 
@@ -339,14 +347,17 @@ async def start_server_instances(
     return procs
 
 
-async def monitor_procs_ready(procs_ports, host, tries=60):
-    ready = []
-    for proc, port in procs_ports:
-        url = f"http://{host}:{port}/health"
-        ok = await wait_for_http(url, tries=tries)
-        LOG.info("Server on port %d ready: %s", port, ok)
-        ready.append(ok)
-    return all(ready)
+async def shutdown_backends(procs_ports, host):
+    import aiohttp
+
+    async with aiohttp.ClientSession() as s:
+        for _proc, port in procs_ports:
+            url = f"http://{host}:{port}/shutdown"
+            try:
+                await s.post(url, json={"reason": "Cluster stopping"})
+                LOG.info("Sent shutdown to backend %d", port)
+            except Exception as e:
+                LOG.warning("Failed shutdown request to %d: %s", port, e)
 
 
 # ----------------------------
@@ -358,6 +369,7 @@ async def main_async(args):
         extra_env["LLLM_ACCESS_LOG"] = "true"
     if args.model_auth:
         extra_env["HF_AUTH_TOKEN"] = args.model_auth
+
     LOG.info("Pre-downloading model cache...")
     predownload_model(args.model_id, args.bitness)
 
@@ -374,9 +386,7 @@ async def main_async(args):
     )
 
     try:
-        LOG.info(
-            "Waiting for backends to become ready (model load may take minutes)..."
-        )
+        LOG.info("Waiting for backends to become ready...")
         all_ready = await monitor_procs_ready(procs, args.host, tries=120)
         if not all_ready:
             LOG.warning(
@@ -393,7 +403,6 @@ async def main_async(args):
         )
         lb_task = asyncio.create_task(lb.start(host=args.host, port=args.lb_port))
 
-        # Signal handling
         loop = asyncio.get_running_loop()
         stop_ev = asyncio.Event()
         loop.add_signal_handler(signal.SIGINT, stop_ev.set)
@@ -402,6 +411,7 @@ async def main_async(args):
         LOG.info("Shutdown signal received, stopping LB and servers...")
 
         lb.stop()
+        await shutdown_backends(procs, args.host)
         await asyncio.sleep(1)
 
     finally:
@@ -417,36 +427,92 @@ async def main_async(args):
     LOG.info("Cluster stopped.")
 
 
+# ----------------------------
+# Argument parsing
+# ----------------------------
 def parse_args():
-    p = argparse.ArgumentParser()
+    import multiprocessing
 
-    # Detect total CPU cores
     total_cores = multiprocessing.cpu_count()
-    # Suggest a reasonable number of threads per process (e.g., 1/8 of total cores, min 1)
-    threads_per_proc = max(1, total_cores // 8)
-    # Max concurrency per backend: use 1 per 4 cores, at least 1
-    max_concurrency_per_backend = max(1, total_cores // 4)
 
-    p.add_argument("--num", type=int, default=8)
-    p.add_argument("--base-port", type=int, default=8001)
-    p.add_argument("--lb-port", type=int, default=8000)
-    p.add_argument("--host", type=str, default="0.0.0.0")
-    p.add_argument("--model-id", type=str, default=choose_model())
+    p = argparse.ArgumentParser(description="Start LLM cluster with load balancer")
+
+    # ---------------- Core cluster parameters ----------------
     p.add_argument(
-        "--bitness", type=str, default="16bit", choices=("4bit", "8bit", "16bit")
+        "--num",
+        type=int,
+        default=8,
+        help="Number of backend instances",
     )
-    p.add_argument("--threads-per-proc", type=int, default=threads_per_proc)
-    p.add_argument("--cores-total", type=int, default=total_cores)
     p.add_argument(
-        "--max-concurrency-per-backend", type=int, default=max_concurrency_per_backend
+        "--base-port",
+        type=int,
+        default=8001,
+        help="Base port for backend instances",
     )
-    p.add_argument("--retries", type=int, default=3)
-    p.add_argument("--health-interval", type=int, default=30)
-    p.add_argument("--access-log", type=int, choices=(0, 1), default=0)
-    p.add_argument("--model-auth", type=str, default=None)
+    p.add_argument(
+        "--lb-port",
+        type=int,
+        default=8000,
+        help="Port for the load balancer",
+    )
+    p.add_argument("--host", type=str, default="0.0.0.0", help="Host for all servers")
+    p.add_argument("--model-id", type=str, default=choose_model(), help="Model to load")
+    p.add_argument(
+        "--bitness",
+        type=str,
+        default="16bit",
+        choices=("4bit", "8bit", "16bit"),
+        help="Model precision / quantization",
+    )
+
+    # ---------------- Thread / concurrency ----------------
+    p.add_argument(
+        "--threads-per-proc",
+        type=int,
+        default=None,
+        help="Threads per backend instance (derived from total cores / num if not set)",
+    )
+    p.add_argument(
+        "--cores-total",
+        type=int,
+        default=total_cores,
+        help="Total CPU cores available",
+    )
+    p.add_argument(
+        "--max-concurrency-per-backend",
+        type=int,
+        default=None,
+        help="Max concurrent requests per backend (derived from threads-per-proc if not set)",
+    )
+
+    # ---------------- Other options ----------------
+    p.add_argument("--retries", type=int, default=3, help="Retries per request in LB")
+    p.add_argument(
+        "--health-interval", type=int, default=30, help="Health check interval"
+    )
+    p.add_argument(
+        "--access-log", type=int, choices=(0, 1), default=0, help="Enable access log"
+    )
+    p.add_argument(
+        "--model-auth", type=str, default=None, help="HF auth token if needed"
+    )
+
     args = p.parse_args()
 
-    # Log all arguments
+    # ---------------- Derived values ----------------
+    # Threads per proc based on actual number of instances
+    if args.threads_per_proc is None:
+        args.threads_per_proc = max(1, args.cores_total // args.num)
+
+    # Max concurrency per backend based on threads per proc
+    if args.max_concurrency_per_backend is None:
+        args.max_concurrency_per_backend = max(1, args.threads_per_proc // 4)
+
+    # Compute cores per instance for taskset / logging
+    args.cores_per_proc = max(1, args.cores_total // args.num)
+
+    # ---------------- Logging ----------------
     LOG.info("Cluster arguments:")
     for k, v in vars(args).items():
         LOG.info("  %s = %s", k, v)

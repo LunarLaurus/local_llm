@@ -12,7 +12,6 @@ from .taskqueue import (
     init_queue,
     start_workers,
     stop_workers,
-    enqueue_job,
 )
 from .generator import Generator
 from laurus_llm import endpoints
@@ -134,9 +133,9 @@ class LocalLLMServer:
         bitness: BitnessType = "16bit",
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        title: str = "Local LLM Server",
+        title: str = "Laurus Local LLM Server",
         version: str = "2.0",
-        num_workers: int = 2,
+        num_workers: int = 4,
     ):
         self.model_id = model_id or DEFAULT_MODEL_ID
         self.bitness = bitness
