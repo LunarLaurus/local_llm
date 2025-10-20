@@ -5,6 +5,7 @@ start_cluster.py - Refactored Cluster Manager
 - Staggered backend startup
 - Wait for model load and queue readiness
 - Async least-connections load balancer
+- Job-aware routing for /generate, /result, /cancel
 - Full logging, graceful shutdown
 """
 
@@ -81,6 +82,9 @@ class AsyncLoadBalancer:
         self.total_requests = 0
         self.total_errors = 0
 
+        # Job mapping: job_id -> backend
+        self.job_backend_map: dict[str, Backend] = {}
+
     async def start_healthchecks(self):
         LOG.info("Starting health checks every %.1fs", self.health_interval)
         while not self._stop.is_set():
@@ -123,13 +127,31 @@ class AsyncLoadBalancer:
         attempt = 0
         body = await request.read()
 
-        while attempt <= self.retries:
+        # Parse JSON if POST
+        json_body = None
+        if request.method.upper() == "POST":
+            try:
+                json_body = await request.json()
+            except Exception:
+                pass
+
+        # Determine job_id for special routing
+        job_id = request.match_info.get("job_id")
+        b = None
+
+        # /generate: assign backend and store mapping
+        if request.path == "/generate":
             b = self.choose_backend()
+        elif job_id and job_id in self.job_backend_map:
+            b = self.job_backend_map[job_id]
+        else:
+            b = self.choose_backend()
+
+        while attempt <= self.retries:
             if b.active >= b.max_concurrency:
                 await asyncio.sleep(0.01 * (2**attempt))
                 attempt += 1
                 continue
-
             async with b.lock:
                 b.active += 1
             start = asyncio.get_event_loop().time()
@@ -156,23 +178,30 @@ class AsyncLoadBalancer:
                     data=body,
                     timeout=120,
                 ) as resp:
-                    response = web.StreamResponse(
-                        status=resp.status, reason=resp.reason
-                    )
-                    for k, v in resp.headers.items():
-                        if k.lower() not in (
-                            "connection",
-                            "keep-alive",
-                            "transfer-encoding",
-                        ):
-                            response.headers[k] = v
-                    await response.prepare(request)
-                    async for chunk in resp.content.iter_chunked(64 * 1024):
-                        await response.write(chunk)
-                    await response.write_eof()
-                    latency = asyncio.get_event_loop().time() - start
-                    LOG.info("Proxied request to %s in %.3fs", b.url, latency)
-                    return response
+                    if request.path == "/generate":
+                        resp_json = await resp.json()
+                        job_id_resp = resp_json.get("job_id")
+                        if job_id_resp:
+                            self.job_backend_map[job_id_resp] = b
+                        return web.json_response(resp_json, status=resp.status)
+                    else:
+                        response = web.StreamResponse(
+                            status=resp.status, reason=resp.reason
+                        )
+                        for k, v in resp.headers.items():
+                            if k.lower() not in (
+                                "connection",
+                                "keep-alive",
+                                "transfer-encoding",
+                            ):
+                                response.headers[k] = v
+                        await response.prepare(request)
+                        async for chunk in resp.content.iter_chunked(64 * 1024):
+                            await response.write(chunk)
+                        await response.write_eof()
+                        latency = asyncio.get_event_loop().time() - start
+                        LOG.info("Proxied request to %s in %.3fs", b.url, latency)
+                        return response
             except Exception as e:
                 LOG.warning("Proxy error to %s: %s", b.url, e)
                 last_exc = e
@@ -207,6 +236,10 @@ class AsyncLoadBalancer:
         app = web.Application()
         app.router.add_get("/health", self.health)
         app.router.add_get("/metrics", self.metrics)
+        # Match generate, result, cancel, or anything else
+        app.router.add_route("*", "/generate", self.proxy_request)
+        app.router.add_route("*", "/result/{job_id}", self.proxy_request)
+        app.router.add_route("*", "/cancel/{job_id}", self.proxy_request)
         app.router.add_route("*", "/{tail:.*}", self.proxy_request)
         runner = web.AppRunner(app)
         await runner.setup()
@@ -259,7 +292,6 @@ async def monitor_procs_ready(procs_ports, host, tries=60):
 # ----------------------------
 def predownload_model(model_id: str, bitness: str):
     from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-    import logging
 
     logger = logging.getLogger("predownload")
     logger.info("Pre-downloading model %s (%s)...", model_id, bitness)
@@ -431,30 +463,14 @@ async def main_async(args):
 # Argument parsing
 # ----------------------------
 def parse_args():
-    import multiprocessing
-
     total_cores = multiprocessing.cpu_count()
 
     p = argparse.ArgumentParser(description="Start LLM cluster with load balancer")
 
-    # ---------------- Core cluster parameters ----------------
+    p.add_argument("--num", type=int, default=8, help="Number of backend instances")
+    p.add_argument("--base-port", type=int, default=8001, help="Base port for backends")
     p.add_argument(
-        "--num",
-        type=int,
-        default=8,
-        help="Number of backend instances",
-    )
-    p.add_argument(
-        "--base-port",
-        type=int,
-        default=8001,
-        help="Base port for backend instances",
-    )
-    p.add_argument(
-        "--lb-port",
-        type=int,
-        default=8000,
-        help="Port for the load balancer",
+        "--lb-port", type=int, default=8000, help="Port for the load balancer"
     )
     p.add_argument("--host", type=str, default="0.0.0.0", help="Host for all servers")
     p.add_argument("--model-id", type=str, default=choose_model(), help="Model to load")
@@ -465,54 +481,22 @@ def parse_args():
         choices=("4bit", "8bit", "16bit"),
         help="Model precision / quantization",
     )
-
-    # ---------------- Thread / concurrency ----------------
-    p.add_argument(
-        "--threads-per-proc",
-        type=int,
-        default=None,
-        help="Threads per backend instance (derived from total cores / num if not set)",
-    )
-    p.add_argument(
-        "--cores-total",
-        type=int,
-        default=total_cores,
-        help="Total CPU cores available",
-    )
-    p.add_argument(
-        "--max-concurrency-per-backend",
-        type=int,
-        default=None,
-        help="Max concurrent requests per backend (derived from threads-per-proc if not set)",
-    )
-
-    # ---------------- Other options ----------------
-    p.add_argument("--retries", type=int, default=3, help="Retries per request in LB")
-    p.add_argument(
-        "--health-interval", type=int, default=30, help="Health check interval"
-    )
-    p.add_argument(
-        "--access-log", type=int, choices=(0, 1), default=0, help="Enable access log"
-    )
-    p.add_argument(
-        "--model-auth", type=str, default=None, help="HF auth token if needed"
-    )
+    p.add_argument("--threads-per-proc", type=int, default=None)
+    p.add_argument("--cores-total", type=int, default=total_cores)
+    p.add_argument("--max-concurrency-per-backend", type=int, default=None)
+    p.add_argument("--retries", type=int, default=3)
+    p.add_argument("--health-interval", type=int, default=30)
+    p.add_argument("--access-log", type=int, choices=(0, 1), default=0)
+    p.add_argument("--model-auth", type=str, default=None)
 
     args = p.parse_args()
 
-    # ---------------- Derived values ----------------
-    # Threads per proc based on actual number of instances
     if args.threads_per_proc is None:
         args.threads_per_proc = max(1, args.cores_total // args.num)
-
-    # Max concurrency per backend based on threads per proc
     if args.max_concurrency_per_backend is None:
         args.max_concurrency_per_backend = max(1, args.threads_per_proc // 4)
-
-    # Compute cores per instance for taskset / logging
     args.cores_per_proc = max(1, args.cores_total // args.num)
 
-    # ---------------- Logging ----------------
     LOG.info("Cluster arguments:")
     for k, v in vars(args).items():
         LOG.info("  %s = %s", k, v)
