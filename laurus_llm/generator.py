@@ -7,7 +7,7 @@ from .lauruslog import LOG
 class Generator:
     """
     Wraps a HuggingFace LLM pipeline with configurable bitness, max tokens, and temperature.
-    Supports a singleton instance for global access.
+    Supports singleton instance for global access. Automatically falls back to CPU if no GPU.
     """
 
     _instance: Optional["Generator"] = None
@@ -30,21 +30,30 @@ class Generator:
         self._thread_lock = threading.Lock()
 
     def load_model(self, model_id: Optional[str] = None):
-        """Load HuggingFace model and tokenizer based on bitness."""
+        """Load HuggingFace model and tokenizer with GPU fallback to CPU."""
         from transformers import (
             AutoTokenizer,
             AutoModelForCausalLM,
             pipeline,
             BitsAndBytesConfig,
         )
+        import torch
 
         model_id = model_id or self.model_id
         LOG.info("Loading model %s with %s", model_id, self.bitness)
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
 
+        # Detect if GPU is available
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if device == "cpu":
+            LOG.info("No GPU detected. Optimizing model for CPU inference.")
+        else:
+            LOG.info("GPU detected. Using CUDA for inference.")
+
         try:
-            if self.bitness == "4bit":
+            if self.bitness == "4bit" and device != "cpu":
+                # Only load 4-bit quantized if GPU exists
                 bnb_config = BitsAndBytesConfig(load_in_4bit=True)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
@@ -53,7 +62,7 @@ class Generator:
                     trust_remote_code=True,
                 )
                 LOG.info("Loaded 4-bit quantized model")
-            elif self.bitness == "8bit":
+            elif self.bitness == "8bit" and device != "cpu":
                 bnb_config = BitsAndBytesConfig(load_in_8bit=True)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
@@ -63,29 +72,46 @@ class Generator:
                 )
                 LOG.info("Loaded 8-bit quantized model")
             else:
+                # CPU fallback or full precision
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id, device_map="auto", dtype="auto", trust_remote_code=True
+                    model_id,
+                    device_map=None if device == "cpu" else "auto",
+                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                    trust_remote_code=True,
                 )
-                LOG.info("Loaded full precision model")
+                LOG.info("Loaded full precision model on %s", device)
         except Exception as e:
             LOG.warning(
-                "Failed to load model with %s, falling back to float16: %s",
+                "Failed to load model with %s, falling back to CPU float32: %s",
                 self.bitness,
                 e,
             )
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, device_map="auto", dtype="auto", trust_remote_code=True
+                model_id,
+                device_map=None,
+                torch_dtype=torch.float32,
+                trust_remote_code=True,
             )
 
+        # Create pipeline
         self.pipeline = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
             framework="pt",
-            device_map="auto",
+            device=0 if device == "cuda" else -1,
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
         )
+
+        if device == "cpu":
+            # Optimize CPU performance
+            import torch
+
+            torch.set_num_threads(max(1, torch.get_num_threads()))
+            LOG.info("CPU threads available: %d", torch.get_num_threads())
+
         self.model_id = model_id
-        LOG.info("Model pipeline ready")
+        LOG.info("Model pipeline ready on %s", device)
 
     def generate(
         self,
