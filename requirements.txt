@@ -6,3 +6,4 @@ accelerate
 pyyaml
 requests
 pydantic
+aiohttp
