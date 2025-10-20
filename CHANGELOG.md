@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/LunarLaurus/local_llm/tree/HEAD)
+## [v](https://github.com/LunarLaurus/local_llm/tree/v) (2025-10-20)
 
-[Full Changelog](https://github.com/LunarLaurus/local_llm/compare/266862c2ba0258acd97f10da37cd14e45d9ec643...HEAD)
+[Full Changelog](https://github.com/LunarLaurus/local_llm/compare/266862c2ba0258acd97f10da37cd14e45d9ec643...v)
 
 **Merged pull requests:**
 
