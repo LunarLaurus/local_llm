@@ -11,6 +11,7 @@ start_cluster.py - Improved for Ubuntu
 import argparse
 import asyncio
 import logging
+import multiprocessing
 import os
 import shutil
 import signal
@@ -63,9 +64,9 @@ class AsyncLoadBalancer:
         self,
         backends: List[str],
         max_concurrency_per_backend: int = 4,
-        retries: int = 1,
+        retries: int = 3,
         health_path: str = "/health",
-        health_interval: float = 5.0,
+        health_interval: float = 30.0,
     ):
         self.backends = [Backend(b, max_concurrency_per_backend) for b in backends]
         self._rr = deque(self.backends)
@@ -369,7 +370,7 @@ async def main_async(args):
         cores_total=args.cores_total,
         threads_per_proc=args.threads_per_proc,
         extra_env=extra_env,
-        stagger=5,
+        stagger=10,
     )
 
     try:
@@ -401,7 +402,7 @@ async def main_async(args):
         LOG.info("Shutdown signal received, stopping LB and servers...")
 
         lb.stop()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(1)
 
     finally:
         for proc, port in procs:
@@ -418,19 +419,28 @@ async def main_async(args):
 
 def parse_args():
     p = argparse.ArgumentParser()
+
+    # Detect total CPU cores
+    total_cores = multiprocessing.cpu_count()
+    # Suggest a reasonable number of threads per process (e.g., 1/8 of total cores, min 1)
+    threads_per_proc = max(1, total_cores // 8)
+    # Max concurrency per backend: use 1 per 4 cores, at least 1
+    max_concurrency_per_backend = max(1, total_cores // 4)
     p.add_argument("--num", type=int, default=8)
-    p.add_argument("--base-port", type=int, default=8000)
-    p.add_argument("--lb-port", type=int, default=8080)
+    p.add_argument("--base-port", type=int, default=8001)
+    p.add_argument("--lb-port", type=int, default=8000)
     p.add_argument("--host", type=str, default="127.0.0.1")
     p.add_argument("--model-id", type=str, default=choose_model())
     p.add_argument(
         "--bitness", type=str, default="16bit", choices=("4bit", "8bit", "16bit")
     )
-    p.add_argument("--threads-per-proc", type=int, default=10)
-    p.add_argument("--cores-total", type=int, default=80)
-    p.add_argument("--max-concurrency-per-backend", type=int, default=4)
-    p.add_argument("--retries", type=int, default=1)
-    p.add_argument("--health-interval", type=int, default=5)
+    p.add_argument("--threads-per-proc", type=int, default=threads_per_proc)
+    p.add_argument("--cores-total", type=int, default=total_cores)
+    p.add_argument(
+        "--max-concurrency-per-backend", type=int, default=max_concurrency_per_backend
+    )
+    p.add_argument("--retries", type=int, default=3)
+    p.add_argument("--health-interval", type=int, default=30)
     p.add_argument("--access-log", type=int, choices=(0, 1), default=0)
     p.add_argument("--model-auth", type=str, default=None)
     return p.parse_args()
