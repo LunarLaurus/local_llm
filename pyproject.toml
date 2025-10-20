@@ -1,29 +1,18 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = [ "setuptools>=64", "wheel",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "laurus-llm"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local LLM server"
 readme = "README.md"
 requires-python = ">=3.10"
-
-dependencies = [
-    "fastapi",
-    "uvicorn",
-    "transformers",
-    "bitsandbytes",
-    "accelerate",
-    "pyyaml",
-    "requests",
-    "pydantic",
-]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["laurus_llm*"]
+dependencies = [ "fastapi", "uvicorn", "transformers", "bitsandbytes", "accelerate", "pyyaml", "requests", "pydantic",]
 
 [project.scripts]
-# Your server's CLI entrypoint — app.py now lives at laurus_llm.app
 laurus-llm = "laurus_llm.app:main"
+
+[tool.setuptools.packages.find]
+where = [ ".",]
+include = [ "laurus_llm*",]
