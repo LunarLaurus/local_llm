@@ -1,6 +1,6 @@
 import asyncio
 from typing import Any, Callable
-from laurus_llm.lauruslog import LOG
+from .lauruslog import LOG
 
 # ---------------- Globals ----------------
 job_queue: "asyncio.Queue[dict]" = asyncio.Queue()

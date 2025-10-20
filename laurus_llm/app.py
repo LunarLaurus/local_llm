@@ -1,20 +1,25 @@
 # server/app.py
+from contextlib import asynccontextmanager
 import os
 import asyncio
-from typing import Optional
+from typing import Optional, cast
+from typing import Literal
 from fastapi import FastAPI
 
-from laurus_llm.lauruslog import LOG
-from laurus_llm.config import DEFAULT_MODEL_ID
-from laurus_llm.taskqueue import (
+from .lauruslog import LOG
+from .config import DEFAULT_MODEL_ID
+from .taskqueue import (
     init_queue,
     start_workers,
     stop_workers,
     enqueue_job,
 )
-from laurus_llm.generator import Generator
-import laurus_llm.generator as generator_module
+from .generator import Generator
+import generator as generator_module
 from laurus_llm import endpoints
+
+
+BitnessType = Literal["4bit", "8bit", "16bit"]
 
 
 # -----------------------------
@@ -60,6 +65,26 @@ def prompt_bool(
     return raw in ("y", "yes", "t", "true", "1", "ok")
 
 
+def parse_bitness(user_input: str, default: BitnessType = "16bit") -> BitnessType:
+    """Convert user input to a valid bitness literal, default if invalid."""
+    user_input = user_input.strip().lower()
+
+    mapping = {
+        "4": "4bit",
+        "4bit": "4bit",
+        "8": "8bit",
+        "8bit": "8bit",
+        "16": "16bit",
+        "16bit": "16bit",
+    }
+
+    # map or default
+    value = mapping.get(user_input, default)
+
+    # cast to satisfy type checker
+    return cast(BitnessType, value)
+
+
 # -----------------------------
 # LocalLLMServer wrapper
 # -----------------------------
@@ -69,7 +94,7 @@ class LocalLLMServer:
     def __init__(
         self,
         model_id: Optional[str] = None,
-        bitness: str = "16bit",
+        bitness: BitnessType = "16bit",
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         title: str = "Local LLM Server",
@@ -92,7 +117,7 @@ class LocalLLMServer:
         self.generator = Generator(
             model_id=self.model_id, bitness=self.bitness, **gen_kwargs
         )
-        generator_module.generator = self.generator
+        Generator.set_instance(self.generator)
 
         self.worker_tasks_started = False  # track if workers started
         # FastAPI app
@@ -108,6 +133,7 @@ class LocalLLMServer:
             await start_workers(self.generator.generate, num_workers=self.num_workers)
             self.worker_tasks_started = True
 
+    @asynccontextmanager
     async def _lifespan(self, app: FastAPI):
         """Startup and shutdown lifecycle for FastAPI."""
         LOG.info("Server startup (lifespan)")
@@ -157,11 +183,13 @@ def main():
         default="ibm-granite/granite-3b-code-instruct-128k",
         env_key="LLLM_MODEL_ID",
     )
-    LLLM_BITNESS = input_with_timeout(
-        "Enter quantization bitness (4bit / 8bit / 16bit)",
-        timeout=10,
-        default="16bit",
-        env_key="LLLM_BITNESS",
+    LLLM_BITNESS = parse_bitness(
+        input_with_timeout(
+            "Enter quantization bitness (4bit / 8bit / 16bit)",
+            timeout=10,
+            default="16bit",
+            env_key="LLLM_BITNESS",
+        )
     )
     LLLM_PORT = int(
         input_with_timeout(

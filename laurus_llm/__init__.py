@@ -2,7 +2,7 @@
 """laurus_llm — direct exports (eager imports)."""
 
 from . import client
-from .app import LocalLLMServer, create_app, app, input_with_timeout, prompt_bool
+from .app import LocalLLMServer, input_with_timeout, prompt_bool, parse_bitness
 from .endpoints import register_routes
 from .generator import Generator
 from .models import (
@@ -25,10 +25,9 @@ from .lauruslog import LaurusLogger
 __all__ = [
     "client",
     "LocalLLMServer",
-    "create_app",
-    "app",
     "input_with_timeout",
     "prompt_bool",
+    "parse_bitness",
     "register_routes",
     "Generator",
     "GenerateRequest",

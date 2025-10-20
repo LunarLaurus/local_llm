@@ -1,7 +1,7 @@
 import threading
 from typing import Literal, Optional
 from .config import DEFAULT_MODEL_ID, DEFAULT_MAX_TOKENS, DEFAULT_TEMP, MODES
-from laurus_llm.lauruslog import LOG
+from .lauruslog import LOG
 
 
 class Generator:
@@ -10,7 +10,7 @@ class Generator:
     Supports a singleton instance for global access.
     """
 
-    _instance: "Generator" = None
+    _instance: Optional["Generator"] = None
     current_mode = {"name": "c", "system_prompt": MODES["c"]}
 
     def __init__(
@@ -99,6 +99,8 @@ class Generator:
         max_new_tokens = max(1, min(2000, int(max_tokens or self.max_tokens)))
         temp = float(temperature if temperature is not None else self.temperature)
 
+        assert self.tokenizer is not None, "Model tokenizer not loaded yet"
+        assert self.pipeline is not None, "Model pipeline not loaded yet"
         with self._thread_lock:
             outputs = self.pipeline(
                 full_prompt,
@@ -119,3 +121,8 @@ class Generator:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @classmethod
+    def set_instance(cls, instance: "Generator"):
+        """Set the singleton instance explicitly."""
+        cls._instance = instance
