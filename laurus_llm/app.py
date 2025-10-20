@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi import FastAPI
 
 from .lauruslog import LOG
-from .config import DEFAULT_MODEL_ID
+from .config import DEFAULT_MODEL_ID, MODEL_CHOICES
 from .taskqueue import (
     init_queue,
     start_workers,
@@ -27,7 +27,11 @@ BitnessType = Literal["4bit", "8bit", "16bit"]
 def input_with_timeout(
     prompt: str, timeout: int, default: str, env_key: Optional[str] = None
 ) -> str:
-    """Prompt with timeout, returning default if no input, or env variable if set."""
+    """
+    Prompt user with timeout, returning default if no input,
+    or environment variable if set. Shows the default in the prompt.
+    """
+    # Use environment variable if set
     env = os.environ.get(env_key) if env_key else None
     if env and env.strip():
         return env.strip()
@@ -36,9 +40,12 @@ def input_with_timeout(
 
     result = [default]
 
+    # Append default to the prompt if not already included
+    display_prompt = f"{prompt} [default: {default}]: "
+
     def _input():
         try:
-            user_input = input(prompt)
+            user_input = input(display_prompt)
             if user_input.strip():
                 result[0] = user_input.strip()
         except Exception:
@@ -82,6 +89,37 @@ def parse_bitness(user_input: str, default: BitnessType = "16bit") -> BitnessTyp
 
     # cast to satisfy type checker
     return cast(BitnessType, value)
+
+
+def choose_model() -> str:
+    print("\nAvailable models:")
+    for idx, model in enumerate(MODEL_CHOICES, start=1):
+        print(f"{idx}. {model}")
+    print("0. Enter a custom model ID")
+
+    choice = input_with_timeout(
+        "Select model by number or type custom: ",
+        timeout=30,
+        default="1",  # default to first model
+        env_key="LLLM_MODEL_ID",
+    ).strip()
+
+    # If they typed a number
+    if choice.isdigit():
+        num = int(choice)
+        if num == 0:
+            # Ask for custom input
+            custom = input_with_timeout(
+                "Enter custom model ID: ",
+                timeout=30,
+                default="ibm-granite/granite-3b-code-instruct-128k",
+            ).strip()
+            return custom or MODEL_CHOICES[0]
+        elif 1 <= num <= len(MODEL_CHOICES):
+            return MODEL_CHOICES[num - 1]
+
+    # Otherwise, treat input as custom string
+    return choice or MODEL_CHOICES[0]
 
 
 # -----------------------------
@@ -176,12 +214,7 @@ class LocalLLMServer:
 # CLI entry point
 # -----------------------------
 def main():
-    LLLM_MODEL_ID = input_with_timeout(
-        "Enter model ID",
-        timeout=30,
-        default="ibm-granite/granite-3b-code-instruct-128k",
-        env_key="LLLM_MODEL_ID",
-    )
+    LLLM_MODEL_ID = choose_model()
     LLLM_BITNESS = parse_bitness(
         input_with_timeout(
             "Enter quantization bitness (4bit / 8bit / 16bit)",
