@@ -1,19 +1,17 @@
-# laurus_llm_client/lauruslog.py
+# laurus_llm/lauruslog.py
 import logging
 
 
 class LaurusLogger:
     """
-    Centralized logger for the client library.
+    Centralized logger for the server library.
     Use:
-        from laurus_llm_client.lauruslog import LOG
+        from laurus_llm.lauruslog import LOG
         LOG.info("Message")
     """
 
     @staticmethod
-    def get_logger(
-        name="laurus-llm-client", level=logging.INFO, suppress_uvicorn_access=True
-    ):
+    def get_logger(name="laurus-llm", level=logging.INFO, suppress_uvicorn_access=True):
         logger = logging.getLogger(name)
         logger.setLevel(level)
 

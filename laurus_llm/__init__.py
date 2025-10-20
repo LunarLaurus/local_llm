@@ -1,7 +1,6 @@
 # laurus_llm/__init__.py (explicit)
 """laurus_llm — direct exports (eager imports)."""
 
-from . import client
 from .app import LocalLLMServer, input_with_timeout, prompt_bool, parse_bitness
 from .endpoints import register_routes
 from .generator import Generator
@@ -23,7 +22,6 @@ from .taskqueue import (
 from .lauruslog import LaurusLogger
 
 __all__ = [
-    "client",
     "LocalLLMServer",
     "input_with_timeout",
     "prompt_bool",
