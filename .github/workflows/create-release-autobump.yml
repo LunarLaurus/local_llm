@@ -40,7 +40,7 @@ jobs:
         uses: apowis/pyproject-bump-version@v0.0.2
         with:
           file_to_bump: "./pyproject.toml"
-          bump_type: "patch"   # can be patch/major/prerelease
+          bump_type: "micro"   # can be micro/major/minor
           main_branch: "main"
           python_version: "3.10"
 
