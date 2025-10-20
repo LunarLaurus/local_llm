@@ -27,6 +27,21 @@ logging.basicConfig(
 LOG = logging.getLogger("start_cluster")
 
 
+async def read_stream(name: str, stream: asyncio.StreamReader):
+    """
+    Read from a process stream (stdout or stderr) safely in a single coroutine.
+    Logs each line with the backend name.
+    """
+    try:
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            LOG.info("[%s] %s", name, line.decode(errors="ignore").rstrip())
+    except Exception as e:
+        LOG.warning("[%s] stream read error: %s", name, e)
+
+
 # ----------------------------
 # Async proxy (least-connections)
 # ----------------------------
@@ -260,14 +275,6 @@ def predownload_model(model_id: str, bitness: str):
     logger.info("Pre-download complete for %s", model_id)
 
 
-async def read_stream(proc, name):
-    while True:
-        line = await proc.stdout.readline()
-        if not line:
-            break
-        LOG.info("[%s stdout] %s", name, line.decode(errors="ignore").rstrip())
-
-
 async def start_server_instances(
     num: int,
     base_port: int,
@@ -312,6 +319,7 @@ async def start_server_instances(
         LOG.info(
             "Starting server %d on port %d cores %d-%d", i, port, start_core, end_core
         )
+        # start subprocess
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             env=env,
@@ -319,8 +327,9 @@ async def start_server_instances(
             stderr=asyncio.subprocess.PIPE,
         )
 
-        asyncio.create_task(read_stream(proc, f"proc{port}"))
-        asyncio.create_task(read_stream(proc, f"proc{port}_err"))
+        # Start one reader per stream
+        asyncio.create_task(read_stream(f"proc-{port}-stdout", proc.stdout))
+        asyncio.create_task(read_stream(f"proc-{port}-stderr", proc.stderr))
 
         procs.append((proc, port))
         LOG.info("Staggering next backend start by %ds", stagger)
