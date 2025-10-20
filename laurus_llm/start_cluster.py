@@ -285,7 +285,7 @@ async def start_server_instances(
     cores_total: int,
     threads_per_proc: int,
     extra_env: dict,
-    stagger: int = 5,
+    stagger: int = 10,
 ):
     procs = []
     cores_per_proc = max(1, cores_total // num)
@@ -426,10 +426,11 @@ def parse_args():
     threads_per_proc = max(1, total_cores // 8)
     # Max concurrency per backend: use 1 per 4 cores, at least 1
     max_concurrency_per_backend = max(1, total_cores // 4)
+
     p.add_argument("--num", type=int, default=8)
     p.add_argument("--base-port", type=int, default=8001)
     p.add_argument("--lb-port", type=int, default=8000)
-    p.add_argument("--host", type=str, default="127.0.0.1")
+    p.add_argument("--host", type=str, default="0.0.0.0")
     p.add_argument("--model-id", type=str, default=choose_model())
     p.add_argument(
         "--bitness", type=str, default="16bit", choices=("4bit", "8bit", "16bit")
@@ -443,15 +444,23 @@ def parse_args():
     p.add_argument("--health-interval", type=int, default=30)
     p.add_argument("--access-log", type=int, choices=(0, 1), default=0)
     p.add_argument("--model-auth", type=str, default=None)
-    return p.parse_args()
+    args = p.parse_args()
+
+    # Log all arguments
+    LOG.info("Cluster arguments:")
+    for k, v in vars(args).items():
+        LOG.info("  %s = %s", k, v)
+
+    return args
 
 
 def main():
     args = parse_args()
     try:
+        LOG.info("Starting cluster...")
         asyncio.run(main_async(args))
     except KeyboardInterrupt:
-        LOG.info("Interrupted")
+        LOG.info("Interrupted by user")
 
 
 if __name__ == "__main__":
